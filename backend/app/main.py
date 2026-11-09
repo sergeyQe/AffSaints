@@ -1,6 +1,6 @@
 from fastapi import APIRouter, FastAPI
 
-from app.api import auth, health, users
+from app.api import auth, health, tasks, users
 from app.core.config import DEFAULT_JWT_SECRET, get_settings
 from app.core.errors import register_error_handlers
 
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     api.include_router(health.router)
     api.include_router(auth.router)
     api.include_router(users.router)
+    api.include_router(tasks.router)
     app.include_router(api)
     return app
 

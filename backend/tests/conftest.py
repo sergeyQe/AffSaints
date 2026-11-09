@@ -18,12 +18,14 @@ os.environ["APP_BCRYPT_ROUNDS"] = "4"
 os.environ["APP_DEMO_MODE"] = "true"
 
 from collections.abc import Callable  # noqa: E402
+from datetime import UTC, datetime, timedelta  # noqa: E402
 
 import asyncpg  # noqa: E402
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from app.core import clock  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import Base, engine  # noqa: E402
 from app.core.security import create_access_token, login_throttle  # noqa: E402
@@ -72,6 +74,27 @@ async def _clean_tables() -> None:
 @pytest.fixture(autouse=True)
 def _reset_login_throttle() -> None:
     login_throttle._failures.clear()
+
+
+class FakeClock:
+    """Управляемые часы: тесты двигают время вручную."""
+
+    def __init__(self, start: datetime) -> None:
+        self.current = start
+
+    def __call__(self) -> datetime:
+        return self.current
+
+    def advance(self, **delta: float) -> datetime:
+        self.current += timedelta(**delta)
+        return self.current
+
+
+@pytest.fixture
+def fake_clock(monkeypatch: pytest.MonkeyPatch) -> FakeClock:
+    fake = FakeClock(datetime(2026, 11, 2, 9, 0, tzinfo=UTC))
+    monkeypatch.setattr(clock, "now", fake)
+    return fake
 
 
 @pytest.fixture
