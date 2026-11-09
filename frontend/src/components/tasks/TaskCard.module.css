@@ -5,6 +5,9 @@
     box-shadow 120ms ease,
     border-color 120ms ease;
   touch-action: manipulation;
+  /* Длинный оффер без пробелов переносится, а не растягивает колонку */
+  min-width: 0;
+  overflow-wrap: anywhere;
 
   &:hover {
     box-shadow: var(--mantine-shadow-sm);

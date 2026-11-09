@@ -175,7 +175,9 @@ export function TaskDrawer({ taskId, tab, onTabChange, onClose, onEdit }: Props)
       )}
       {task && (
         <Stack>
-          <Title order={3}>{task.offer}</Title>
+          <Title order={3} style={{ overflowWrap: 'anywhere' }}>
+            {task.offer}
+          </Title>
           <TaskActions
             task={task}
             onEdit={() => onEdit(task)}
