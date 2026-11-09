@@ -127,6 +127,12 @@ async def take(task_id: int, session: Session, user: CurrentUser) -> TaskDetail:
     return await to_detail(session, await service.take(session, task_id, user), user)
 
 
+@router.post("/{task_id}/assign")
+async def assign(task_id: int, body: ReassignIn, session: Session, user: CurrentUser) -> TaskDetail:
+    task = await service.assign(session, task_id, user, body.assignee_id)
+    return await to_detail(session, task, user)
+
+
 @router.post("/{task_id}/submit")
 async def submit(task_id: int, session: Session, user: CurrentUser) -> TaskDetail:
     return await to_detail(session, await service.submit(session, task_id, user), user)

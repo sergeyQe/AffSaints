@@ -11,6 +11,16 @@ describe('dropAction', () => {
     expect(dropAction(task('new', ['take']), 'in_progress')).toBe('take');
   });
 
+  it('руководитель переносом в «В работе» назначает исполнителя', () => {
+    const head = task('new', ['assign', 'edit', 'cancel']);
+    expect(dropAction(head, 'in_progress')).toBe('assign');
+    expect(allowedTargets(head)).toEqual(['in_progress']);
+    // Если доступны оба действия — «Взять» в приоритете, колонка в целях одна
+    const both = task('new', ['take', 'assign']);
+    expect(dropAction(both, 'in_progress')).toBe('take');
+    expect(allowedTargets(both)).toEqual(['in_progress']);
+  });
+
   it('без права на действие перенос запрещён', () => {
     // Байер видит новую задачу, но взять её не может
     expect(dropAction(task('new', ['edit', 'cancel']), 'in_progress')).toBeNull();

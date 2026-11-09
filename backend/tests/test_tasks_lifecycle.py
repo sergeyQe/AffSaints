@@ -316,6 +316,79 @@ async def test_reassign_validation(as_user: AsUser) -> None:
     assert (await act(buyer, tid, "reassign", assignee_id=other.id)).status_code == 403
 
 
+async def test_head_assigns_new_task_to_creative(as_user: AsUser, fake_clock: FakeClock) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head_user = await create_user(Role.HEAD)
+    head = as_user(head_user)
+    maria = await create_user(Role.CREATIVE, full_name="Мария")
+    tid = (await create_task(buyer))["id"]
+    fake_clock.advance(hours=1)
+    assigned_at = fake_clock.current
+
+    t = ok(await act(head, tid, "assign", assignee_id=maria.id))
+    assert t["status"] == "in_progress"
+    assert t["assignee"]["full_name"] == "Мария"
+    assert t["taken_at"].startswith(assigned_at.isoformat()[:19])
+
+    # Время работы идёт за Марией с момента назначения, сдаёт она
+    fake_clock.advance(minutes=45)
+    t = ok(await submit_work(as_user(maria), tid))
+    assert t["work_seconds"] == 45 * 60
+
+    # В истории — кто назначил и кого, переход Новые → В работе
+    events = ok(await head.get(f"/api/tasks/{tid}/events"))
+    assigned = next(e for e in events if e["type"] == "assigned")
+    assert assigned["from_status"] == "new"
+    assert assigned["to_status"] == "in_progress"
+    assert assigned["payload"]["to"]["full_name"] == "Мария"
+    assert assigned["actor"]["id"] == head_user.id
+
+
+async def test_assign_validation_and_permissions(as_user: AsUser) -> None:
+    author_user = await create_user(Role.BUYER, Role.CREATIVE)
+    author = as_user(author_user)
+    head = as_user(await create_user(Role.HEAD))
+    creative_user = await create_user(Role.CREATIVE)
+    pure_buyer = await create_user(Role.BUYER)
+    inactive = await create_user(Role.CREATIVE, is_active=False)
+    tid = (await create_task(author))["id"]
+
+    # Исполнитель — только активный креативщик и не автор задачи
+    for target in (pure_buyer.id, inactive.id, author_user.id, 999):
+        resp = await act(head, tid, "assign", assignee_id=target)
+        assert resp.status_code == 400, target
+        assert resp.json()["error"]["code"] == "invalid_assignee"
+
+    # Байер и креативщик назначать не могут
+    assert (await act(author, tid, "assign", assignee_id=creative_user.id)).status_code == 403
+    creative = as_user(creative_user)
+    assert (await act(creative, tid, "assign", assignee_id=creative_user.id)).status_code == 403
+
+    # Задачу уже взяли — назначение отклоняется как «уже в работе»
+    ok(await act(creative, tid, "take"))
+    other = await create_user(Role.CREATIVE)
+    resp = await act(head, tid, "assign", assignee_id=other.id)
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "task_already_taken"
+
+
+async def test_concurrent_take_and_assign_only_one_wins(as_user: AsUser) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head = as_user(await create_user(Role.HEAD))
+    creative = as_user(await create_user(Role.CREATIVE))
+    target = await create_user(Role.CREATIVE)
+    tid = (await create_task(buyer))["id"]
+
+    results = await asyncio.gather(
+        act(creative, tid, "take"),
+        act(head, tid, "assign", assignee_id=target.id),
+    )
+
+    assert sorted(r.status_code for r in results) == [200, 409]
+    starts = [e for e in await event_types(buyer, tid) if e in ("taken", "assigned")]
+    assert len(starts) == 1
+
+
 async def test_unassign_returns_task_to_pool(as_user: AsUser, fake_clock: FakeClock) -> None:
     buyer = as_user(await create_user(Role.BUYER))
     head = as_user(await create_user(Role.HEAD))
@@ -363,6 +436,8 @@ async def test_actions_reflect_role_and_status(as_user: AsUser) -> None:
         "add_reference",
     }
     assert ok(await creative.get(f"/api/tasks/{tid}"))["actions"] == ["take"]
+    # Руководитель на новой задаче может назначить исполнителя
+    assert "assign" in ok(await head.get(f"/api/tasks/{tid}"))["actions"]
 
     ok(await act(creative, tid, "take"))
     assert set(ok(await creative.get(f"/api/tasks/{tid}"))["actions"]) == {

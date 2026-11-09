@@ -10,6 +10,7 @@ export type TaskAction =
   | 'edit'
   | 'cancel'
   | 'take'
+  | 'assign'
   | 'submit'
   | 'accept'
   | 'request_revision'
@@ -166,7 +167,7 @@ export type TransitionVars =
   | { id: number; action: 'take' | 'submit' | 'accept' | 'unassign' }
   | { id: number; action: 'request-revision'; comment: string }
   | { id: number; action: 'cancel'; reason: string }
-  | { id: number; action: 'reassign'; assignee_id: number };
+  | { id: number; action: 'assign' | 'reassign'; assignee_id: number };
 
 export function useTransition(handlers: MutationHandlers<TransitionVars> = {}) {
   return useTaskMutation(

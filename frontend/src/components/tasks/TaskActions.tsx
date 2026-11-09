@@ -17,7 +17,7 @@ import { TextPromptModal } from '../common/TextPromptModal';
 import { ReassignModal } from './ReassignModal';
 
 /** Какое окно ввода открыто: комментарий правок, причина отмены, выбор исполнителя. */
-export type PromptKind = 'revision' | 'cancel' | 'reassign' | null;
+export type PromptKind = 'revision' | 'cancel' | 'assign' | 'reassign' | null;
 
 interface Props {
   task: TaskDetail;
@@ -43,6 +43,11 @@ export function TaskActions({ task, onEdit, onResultRequired }: Props) {
             onClick={() => run({ id: task.id, action: 'take' })}
           >
             Взять в работу
+          </Button>
+        )}
+        {can('assign') && (
+          <Button leftSection={<IconUserShare size={16} />} onClick={() => setPrompt('assign')}>
+            Назначить исполнителя
           </Button>
         )}
         {can('submit') && (
@@ -135,13 +140,13 @@ export function TaskActions({ task, onEdit, onResultRequired }: Props) {
         onClose={close}
         onSubmit={(reason) => run({ id: task.id, action: 'cancel', reason }, close)}
       />
-      {prompt === 'reassign' && (
+      {(prompt === 'assign' || prompt === 'reassign') && (
         <ReassignModal
           task={task}
           opened
           loading={isPending}
           onClose={close}
-          onSubmit={(assignee_id) => run({ id: task.id, action: 'reassign', assignee_id }, close)}
+          onSubmit={(assignee_id) => run({ id: task.id, action: prompt, assignee_id }, close)}
         />
       )}
     </>

@@ -68,6 +68,40 @@ describe('TaskActions', () => {
     });
   });
 
+  it('руководитель назначает исполнителя на новую задачу', async () => {
+    const fetch = mockFetch({
+      'GET /api/users': [
+        { id: 4, full_name: 'Иван Петров', login: 'ivan', roles: ['creative'], is_active: true },
+      ],
+      'POST /api/tasks/7/assign': makeTask({ status: 'in_progress' }),
+    });
+    renderActions(['assign', 'edit', 'cancel'], 'new');
+    // Пустые — крестики уведомлений из предыдущих тестов (общее хранилище Mantine)
+    expect(buttons().filter(Boolean)).toEqual([
+      'Назначить исполнителя',
+      'Редактировать ТЗ',
+      'Отменить задачу',
+    ]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Назначить исполнителя' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Назначить исполнителя' });
+    expect(dialog).toHaveTextContent('сразу перейдёт в «В работе»');
+    // Список креативщиков грузится при открытии окна — ждём его
+    await waitFor(() =>
+      expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/users'))).toBe(true),
+    );
+    // Список вариантов Mantine рендерит в портале с анимацией — ищем по тексту
+    await userEvent.click(screen.getByRole('combobox', { name: 'Исполнитель' }));
+    await userEvent.click(await screen.findByText('Иван Петров'));
+    await userEvent.click(screen.getByRole('button', { name: 'Назначить' }));
+
+    await waitFor(() =>
+      expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/tasks/7/assign'))).toBe(true),
+    );
+    const call = fetch.mock.calls.find(([url]) => String(url).endsWith('/tasks/7/assign'));
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ assignee_id: 4 });
+  });
+
   it('сдача без результата ведёт на вкладку файлов', async () => {
     mockFetch({
       'POST /api/tasks/7/submit': jsonError(400, 'result_required', 'Прикрепите результат'),

@@ -117,19 +117,59 @@ async def update_task(session: AsyncSession, task_id: int, data: TaskUpdate, use
 # ---------- переходы статусов ----------
 
 
+async def _validate_assignee(session: AsyncSession, task: Task, assignee_id: int) -> User:
+    """Исполнитель: активный креативщик, не автор и не текущий исполнитель."""
+    target = await session.get(User, assignee_id)
+    if target is None or not target.is_active or not target.has_role(Role.CREATIVE):
+        raise AppError("invalid_assignee", "Исполнителем может быть только активный креативщик")
+    if target.id == task.author_id:
+        raise AppError("invalid_assignee", "Автор задачи не может быть её исполнителем")
+    if target.id == task.assignee_id:
+        raise AppError("invalid_assignee", "Этот пользователь уже исполнитель задачи")
+    return target
+
+
+def _start_work(session: AsyncSession, task: Task, assignee: User, now: datetime) -> str:
+    """Новая задача уходит в работу к исполнителю: статус, время взятия, отрезок работы."""
+    previous = _set_status(task, TaskStatus.IN_PROGRESS, now)
+    task.assignee_id = assignee.id
+    task.assignee = assignee
+    task.taken_at = now
+    # Новый исполнитель открывает актуальное ТЗ — старая пометка «ТЗ изменено» не нужна
+    task.brief_updated_at = None
+    open_interval(session, task, assignee.id, WorkKind.WORK, now)
+    return previous
+
+
 async def take(session: AsyncSession, task_id: int, user: User) -> Task:
     task = await lock_task(session, task_id)
     ensure_allowed(Action.TAKE, task, user)
 
     now = clock.now()
-    previous = _set_status(task, TaskStatus.IN_PROGRESS, now)
-    task.assignee_id = user.id
-    task.assignee = user
-    task.taken_at = now
-    # Новый исполнитель открывает актуальное ТЗ — старая пометка «ТЗ изменено» не нужна
-    task.brief_updated_at = None
-    open_interval(session, task, user.id, WorkKind.WORK, now)
+    previous = _start_work(session, task, user, now)
     add_event(session, task, user, EventType.TAKEN, from_status=previous, to_status=task.status)
+    await session.commit()
+    return task
+
+
+async def assign(session: AsyncSession, task_id: int, user: User, assignee_id: int) -> Task:
+    task = await lock_task(session, task_id)
+    ensure_allowed(Action.ASSIGN, task, user)
+    target = await _validate_assignee(session, task, assignee_id)
+
+    # Руководитель отдаёт новую задачу креативщику: как «Взять», но за выбранного исполнителя
+    now = clock.now()
+    previous = _start_work(session, task, target, now)
+    payload: dict[str, Any] = {"to": user_ref(target)}
+    add_event(
+        session,
+        task,
+        user,
+        EventType.ASSIGNED,
+        from_status=previous,
+        to_status=task.status,
+        **payload,
+    )
     await session.commit()
     return task
 
@@ -224,15 +264,7 @@ async def cancel(session: AsyncSession, task_id: int, user: User, reason: str) -
 async def reassign(session: AsyncSession, task_id: int, user: User, assignee_id: int) -> Task:
     task = await lock_task(session, task_id)
     ensure_allowed(Action.REASSIGN, task, user)
-
-    # Новый исполнитель: активный креативщик, не автор и не текущий исполнитель
-    target = await session.get(User, assignee_id)
-    if target is None or not target.is_active or not target.has_role(Role.CREATIVE):
-        raise AppError("invalid_assignee", "Исполнителем может быть только активный креативщик")
-    if target.id == task.author_id:
-        raise AppError("invalid_assignee", "Автор задачи не может быть её исполнителем")
-    if target.id == task.assignee_id:
-        raise AppError("invalid_assignee", "Этот пользователь уже исполнитель задачи")
+    target = await _validate_assignee(session, task, assignee_id)
 
     # Открытый отрезок работы закрывается за прежним исполнителем и продолжается за новым
     now = clock.now()

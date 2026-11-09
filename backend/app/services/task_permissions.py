@@ -88,6 +88,8 @@ RULES: dict[Action, Rule] = {
     Action.TAKE: Rule(
         frozenset({TaskStatus.NEW}), _creative_not_author, status_conflict=_already_taken
     ),
+    # Руководитель сам назначает исполнителя на новую задачу (docs/decisions.md, «Роли»)
+    Action.ASSIGN: Rule(frozenset({TaskStatus.NEW}), _head, status_conflict=_already_taken),
     Action.SUBMIT: Rule(frozenset({TaskStatus.IN_PROGRESS, TaskStatus.REVISION}), _assignee),
     Action.ACCEPT: Rule(frozenset({TaskStatus.REVIEW}), _reviewer),
     Action.REQUEST_REVISION: Rule(frozenset({TaskStatus.REVIEW}), _reviewer),

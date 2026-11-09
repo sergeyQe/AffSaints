@@ -4,6 +4,7 @@ import { notifyError, notifySuccess } from '../lib/notify';
 
 const SUCCESS_TEXT: Record<TransitionVars['action'], string> = {
   take: 'Задача взята в работу',
+  assign: 'Исполнитель назначен, задача в работе',
   submit: 'Работа сдана на проверку',
   accept: 'Работа принята',
   'request-revision': 'Задача отправлена на правки',

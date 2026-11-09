@@ -66,6 +66,7 @@ const FORMATTERS: Record<string, Formatter> = {
   created: () => text('Задача создана', 'gray'),
   updated: (p) => text('ТЗ изменено', 'violet', changes(p)),
   taken: () => text('Взята в работу', 'blue'),
+  assigned: (p) => text('Назначен исполнитель', 'blue', [`Исполнитель: ${person(p.to)}`]),
   submitted: () => text('Сдана на проверку', 'yellow'),
   resubmitted: () => text('Исправления сданы на проверку', 'yellow'),
   accepted: () => text('Работа принята', 'teal'),

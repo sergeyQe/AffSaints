@@ -9,6 +9,7 @@ import { BoardColumn } from '../components/tasks/BoardColumn';
 import { BoardFilters } from '../components/tasks/BoardFilters';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TextPromptModal } from '../components/common/TextPromptModal';
+import { ReassignModal } from '../components/tasks/ReassignModal';
 import { TaskDrawer } from '../components/tasks/TaskDrawer';
 import { TaskFormModal } from '../components/tasks/TaskFormModal';
 import { useBoardDnd } from '../hooks/useBoardDnd';
@@ -26,7 +27,7 @@ export function BoardPage() {
   // undefined — форма закрыта, null — новая задача, TaskDetail — редактирование
   const [form, setForm] = useState<TaskDetail | null | undefined>(undefined);
   // Сдать не дали без результата — открываем файлы именно этой задачи
-  const { dragged, targets, dndProps, revision } = useBoardDnd((taskId) =>
+  const { dragged, targets, dndProps, revision, assign } = useBoardDnd((taskId) =>
     drawer.open(taskId, 'files'),
   );
 
@@ -116,6 +117,17 @@ export function BoardPage() {
         onClose={revision.cancel}
         onSubmit={revision.submit}
       />
+
+      {assign.task && (
+        <ReassignModal
+          key={`board-assign-${assign.task.id}`}
+          task={assign.task}
+          opened
+          loading={assign.isPending}
+          onClose={assign.cancel}
+          onSubmit={assign.submit}
+        />
+      )}
     </Stack>
   );
 }

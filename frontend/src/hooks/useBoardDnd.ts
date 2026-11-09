@@ -21,6 +21,8 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
   const [dragged, setDragged] = useState<Task | null>(null);
   // Правкам нужен комментарий — перенос в «Правки» открывает окно ввода
   const [revisionFor, setRevisionFor] = useState<Task | null>(null);
+  // Назначению нужен исполнитель — перенос руководителем открывает выбор креативщика
+  const [assignFor, setAssignFor] = useState<Task | null>(null);
   const { run, isPending } = useRunTransition(onResultRequired);
 
   const sensors = useSensors(
@@ -40,8 +42,13 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
     if (!task || !e.over) return;
     const action = dropAction(task, e.over.id as TaskStatus);
     if (!action) return;
+    // Переходы, которым нужен ввод, сначала открывают окно
     if (action === 'request_revision') {
       setRevisionFor(task);
+      return;
+    }
+    if (action === 'assign') {
+      setAssignFor(task);
       return;
     }
     run({ id: task.id, action });
@@ -50,6 +57,10 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
   const submitRevision = (comment: string) =>
     revisionFor &&
     run({ id: revisionFor.id, action: 'request-revision', comment }, () => setRevisionFor(null));
+
+  const submitAssign = (assigneeId: number) =>
+    assignFor &&
+    run({ id: assignFor.id, action: 'assign', assignee_id: assigneeId }, () => setAssignFor(null));
 
   return {
     dragged,
@@ -60,6 +71,12 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
       isPending,
       submit: submitRevision,
       cancel: () => setRevisionFor(null),
+    },
+    assign: {
+      task: assignFor,
+      isPending,
+      submit: submitAssign,
+      cancel: () => setAssignFor(null),
     },
   };
 }

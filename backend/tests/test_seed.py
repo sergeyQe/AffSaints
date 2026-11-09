@@ -53,6 +53,7 @@ async def test_seed_covers_every_status_and_scenario() -> None:
         "revision_requested",
         "resubmitted",
         "reassigned",
+        "assigned",
         "unassigned",
         "updated",
         "cancelled",

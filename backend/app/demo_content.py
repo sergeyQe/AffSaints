@@ -189,7 +189,7 @@ STORIES: list[Story] = [
           [S(4, "take", "ivan"), S(6, "ai", "ivan", ("Midjourney", "20"))]),
     Story("Melbet", "IN", V, 2, NORMAL, "dmitry", 1, 72,
           "Видео с крикетом, 15 сек, хинди-озвучка.",
-          [S(3, "take", "maria"), S(4, "ai", "maria", ("Runway", "30"))],
+          [S(3, "assign", "head", "maria"), S(4, "ai", "maria", ("Runway", "30"))],
           reference_link="https://drive.google.com/drive/folders/cricket-refs"),
     Story("Joycasino", "BR", PL, 1, LOW, "kate", 2, None,
           "Плейабл с выбором сундука, бразильская стилистика.",
@@ -283,6 +283,9 @@ class _Player:
     async def reassign(self, actor: User, login: str) -> None:
         await task_service.reassign(self.session, self.task_id, actor, self.users[login].id)
 
+    async def assign(self, actor: User, login: str) -> None:
+        await task_service.assign(self.session, self.task_id, actor, self.users[login].id)
+
     async def unassign(self, actor: User, _: Any) -> None:
         await task_service.unassign(self.session, self.task_id, actor)
 
@@ -300,7 +303,18 @@ class _Player:
 
     # Допустимые типы шагов — каждому соответствует одноимённый метод
     STEP_TYPES: ClassVar[frozenset[str]] = frozenset(
-        {"take", "submit", "accept", "revision", "cancel", "reassign", "unassign", "edit", "ai"}
+        {
+            "take",
+            "assign",
+            "submit",
+            "accept",
+            "revision",
+            "cancel",
+            "reassign",
+            "unassign",
+            "edit",
+            "ai",
+        }
     )
 
     async def run(self, step: Step, actor: User) -> None:

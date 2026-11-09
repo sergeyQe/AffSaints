@@ -47,6 +47,13 @@ describe('describeEvent', () => {
     expect(text.details).toEqual(['Иван → Мария']);
   });
 
+  it('назначение исполнителя руководителем', () => {
+    expect(describeEvent(event('assigned', { to: { full_name: 'Мария' } }))).toMatchObject({
+      title: 'Назначен исполнитель',
+      details: ['Исполнитель: Мария'],
+    });
+  });
+
   it('вложение-результат', () => {
     expect(
       describeEvent(event('attachment_added', { kind: 'result', name: 'v2.mp4' })),
