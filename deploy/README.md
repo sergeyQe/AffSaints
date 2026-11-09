@@ -15,7 +15,7 @@
 1. Клонировать репозиторий:
 
 ```bash
-git clone https://github.com/<аккаунт>/affsaints-creative-tasks.git /opt/affsaints && cd /opt/affsaints
+git clone https://github.com/sergeyQe/AffSaints.git /opt/affsaints && cd /opt/affsaints
 ```
 
 2. Создать файл с секретами и заполнить `DOMAIN`, `POSTGRES_PASSWORD`, `APP_JWT_SECRET`:
