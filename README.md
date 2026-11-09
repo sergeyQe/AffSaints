@@ -99,6 +99,8 @@ docs/      решения, журнал AI-инструментов, скрин�
 
 Линтеры и типы: ruff + mypy (strict), ESLint + Prettier + TypeScript strict. Всё запускается в GitHub Actions на каждый push; e2e — на одноразовом стенде Docker Compose.
 
+Ручные и автоматические тест-кейсы (206 штук: по ТЗ и по практикам канбан-досок) с покрытием каждого кейса — в [docs/test-cases.md](docs/test-cases.md).
+
 ```bash
 # backend (нужна БД: docker compose up -d db)
 cd backend && python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]" && .venv/Scripts/python -m pytest
