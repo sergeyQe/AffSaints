@@ -1,0 +1,25 @@
+.column {
+  background: var(--mantine-color-gray-0);
+  border: 1px solid var(--mantine-color-gray-2);
+  border-radius: var(--mantine-radius-md);
+  min-width: 210px;
+  flex: 1 1 0;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    opacity 120ms ease;
+
+  &[data-can-drop] {
+    border-color: var(--mantine-color-violet-3);
+    border-style: dashed;
+  }
+
+  &[data-over] {
+    background: var(--mantine-color-violet-0);
+    border-color: var(--mantine-color-violet-5);
+  }
+
+  &[data-disabled] {
+    opacity: 0.55;
+  }
+}

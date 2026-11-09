@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 
 import { AppLayout } from './components/AppLayout';
 import { AiServicesPage } from './pages/AiServicesPage';
+import { ArchivePage } from './pages/ArchivePage';
 import { RequireAuth } from './components/RequireAuth';
 import { BoardPage } from './pages/BoardPage';
 import { NotFoundPage } from './pages/ForbiddenPage';
@@ -14,6 +15,7 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth>{(user) => <AppLayout user={user} />}</RequireAuth>}>
         <Route index element={<BoardPage />} />
+        <Route path="archive" element={<ArchivePage />} />
         <Route
           path="users"
           element={

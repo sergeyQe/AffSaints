@@ -1,6 +1,7 @@
 import { AppShell, Burger, Button, Group, NavLink, Stack, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
+  IconArchive,
   IconChartBar,
   IconLayoutKanban,
   IconLogout,
@@ -24,6 +25,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Доска задач', icon: IconLayoutKanban },
+  { to: '/archive', label: 'Архив', icon: IconArchive },
   { to: '/analytics', label: 'Аналитика', icon: IconChartBar, roles: ['head'] },
   { to: '/users', label: 'Пользователи', icon: IconUsers, roles: ['head'] },
   { to: '/ai-services', label: 'AI-сервисы', icon: IconRobot, roles: ['head'] },

@@ -1,0 +1,23 @@
+.card {
+  cursor: pointer;
+  background: var(--mantine-color-body);
+  transition:
+    box-shadow 120ms ease,
+    border-color 120ms ease;
+  touch-action: manipulation;
+
+  &:hover {
+    box-shadow: var(--mantine-shadow-sm);
+    border-color: var(--mantine-color-violet-3);
+  }
+
+  &[data-overdue] {
+    border-left: 3px solid var(--mantine-color-red-6);
+  }
+
+  &[data-dragging] {
+    box-shadow: var(--mantine-shadow-lg);
+    cursor: grabbing;
+    transform: rotate(1.5deg);
+  }
+}

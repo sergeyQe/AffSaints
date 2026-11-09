@@ -95,12 +95,13 @@ export const taskKeys = {
   events: (id: number) => ['tasks', 'events', id] as const,
 };
 
-export function useTasks(filters: TaskFilters) {
+export function useTasks(filters: TaskFilters, { keepPrevious = true } = {}) {
   return useQuery({
     queryKey: taskKeys.list(filters),
     queryFn: () => api<Task[]>('/tasks', { query: { ...filters } }),
     refetchInterval: BOARD_REFETCH_MS,
-    placeholderData: keepPreviousData,
+    // На доске при смене фильтров держим старые карточки до ответа; в архиве — нет
+    placeholderData: keepPrevious ? keepPreviousData : undefined,
   });
 }
 
@@ -118,16 +119,33 @@ export function useTaskEvents(id: number | null) {
     queryKey: taskKeys.events(id ?? 0),
     queryFn: () => api<TaskEvent[]>(`/tasks/${id}/events`),
     enabled: id !== null,
+    refetchInterval: BOARD_REFETCH_MS,
   });
 }
 
-/** После любого изменения задачи обновляем доску, карточку и историю. */
-function useTaskMutation<V>(fn: (vars: V) => Promise<TaskDetail>) {
+/**
+ * Реакции на результат — на уровне хука, а не mutate(vars, {...}):
+ * в TanStack Query 5 колбэки вызова срабатывают только для последнего mutate.
+ */
+export interface MutationHandlers<V> {
+  onSuccess?: (task: TaskDetail, vars: V) => void;
+  onError?: (error: unknown, vars: V) => void;
+}
+
+/** После любого изменения задачи (и после ошибки — данные могли устареть) обновляем доску и карточку. */
+function useTaskMutation<V>(
+  fn: (vars: V) => Promise<TaskDetail>,
+  handlers: MutationHandlers<V> = {},
+) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,
-    onSuccess: (task) => {
+    onSuccess: (task, vars) => {
       qc.setQueryData(taskKeys.detail(task.id), task);
+      handlers.onSuccess?.(task, vars);
+    },
+    onError: (error, vars) => handlers.onError?.(error, vars),
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: taskKeys.all });
       void qc.invalidateQueries({ queryKey: ['analytics'] });
     },
@@ -150,11 +168,13 @@ export type TransitionVars =
   | { id: number; action: 'cancel'; reason: string }
   | { id: number; action: 'reassign'; assignee_id: number };
 
-export function useTransition() {
-  return useTaskMutation(({ id, action, ...body }: TransitionVars) =>
-    api<TaskDetail>(`/tasks/${id}/${action}`, {
-      method: 'POST',
-      body: Object.keys(body).length ? body : undefined,
-    }),
+export function useTransition(handlers: MutationHandlers<TransitionVars> = {}) {
+  return useTaskMutation(
+    ({ id, action, ...body }: TransitionVars) =>
+      api<TaskDetail>(`/tasks/${id}/${action}`, {
+        method: 'POST',
+        body: Object.keys(body).length ? body : undefined,
+      }),
+    handlers,
   );
 }

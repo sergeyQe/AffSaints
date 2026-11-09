@@ -31,4 +31,11 @@ class ResizeObserverStub {
   disconnect() {}
 }
 window.ResizeObserver = ResizeObserverStub;
+
+// Textarea autosize в Mantine 9 подписывается на document.fonts — в jsdom его нет
+if (!('fonts' in document)) {
+  Object.defineProperty(document, 'fonts', {
+    value: { addEventListener: () => {}, removeEventListener: () => {}, ready: Promise.resolve() },
+  });
+}
 window.HTMLElement.prototype.scrollIntoView = () => {};
