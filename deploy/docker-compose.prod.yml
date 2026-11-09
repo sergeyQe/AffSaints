@@ -26,9 +26,11 @@ services:
     build: ./deploy/proxy
     environment:
       DOMAIN: ${DOMAIN:?Задайте DOMAIN, например creative.example.com}
+      # Если 443 на сервере занят — другой внешний порт (сайт: https://домен:порт)
+      PUBLIC_HTTPS_PORT: ${PUBLIC_HTTPS_PORT:-443}
     ports:
       - "80:80"
-      - "443:443"
+      - "${PUBLIC_HTTPS_PORT:-443}:443"
     volumes:
       - certbot_www:/var/www/certbot
       - letsencrypt:/etc/letsencrypt:ro

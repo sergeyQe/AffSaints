@@ -11,7 +11,7 @@ server {
     }
 
     location / {
-        return 301 https://$host$request_uri;
+        return 301 https://$host__HTTPS_SUFFIX__$request_uri;
     }
 }
 
@@ -32,7 +32,7 @@ server {
     set $app http://frontend:80;
 
     location = /api/auth/login {
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header Strict-Transport-Security "max-age=__HSTS_MAX_AGE__" always;
         limit_req zone=login burst=5 nodelay;
         limit_req_status 429;
         proxy_pass $app;
@@ -43,7 +43,7 @@ server {
     }
 
     location / {
-        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header Strict-Transport-Security "max-age=__HSTS_MAX_AGE__" always;
         proxy_pass $app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
