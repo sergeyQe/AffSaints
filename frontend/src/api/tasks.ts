@@ -14,6 +14,7 @@ export type TaskAction =
   | 'submit'
   | 'accept'
   | 'request_revision'
+  | 'reopen'
   | 'reassign'
   | 'unassign'
   | 'add_reference'
@@ -165,7 +166,7 @@ export function useUpdateTask() {
 
 export type TransitionVars =
   | { id: number; action: 'take' | 'submit' | 'accept' | 'unassign' }
-  | { id: number; action: 'request-revision'; comment: string }
+  | { id: number; action: 'request-revision' | 'reopen'; comment: string }
   | { id: number; action: 'cancel'; reason: string }
   | { id: number; action: 'assign' | 'reassign'; assignee_id: number };
 

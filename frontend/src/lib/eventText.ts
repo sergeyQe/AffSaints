@@ -72,6 +72,10 @@ const FORMATTERS: Record<string, Formatter> = {
   accepted: () => text('Работа принята', 'teal'),
   revision_requested: (p) =>
     text(`Отправлена на правки (круг ${String(p.round ?? '')})`, 'orange', [`«${str(p.comment)}»`]),
+  reopened: (p) =>
+    text(`Принятая работа возвращена на правки (круг ${String(p.round ?? '')})`, 'orange', [
+      `«${str(p.comment)}»`,
+    ]),
   cancelled: (p) => text('Задача отменена', 'red', [`Причина: «${str(p.reason)}»`]),
   reassigned: (p) => text('Исполнитель заменён', 'grape', [`${person(p.from)} → ${person(p.to)}`]),
   unassigned: (p) =>

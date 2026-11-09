@@ -21,6 +21,20 @@ describe('dropAction', () => {
     expect(allowedTargets(both)).toEqual(['in_progress']);
   });
 
+  it('руководитель возвращает задачу с проверки в пул', () => {
+    const t = task('review', ['accept', 'request_revision', 'unassign', 'reassign']);
+    expect(dropAction(t, 'new')).toBe('unassign');
+    expect(allowedTargets(t)).toEqual(['done', 'revision', 'new']);
+  });
+
+  it('руководитель возвращает принятую работу на правки', () => {
+    const t = task('done', ['reopen', 'manage_ai_usage']);
+    expect(dropAction(t, 'revision')).toBe('reopen');
+    expect(allowedTargets(t)).toEqual(['revision']);
+    // Без права — из «Готово» никуда
+    expect(allowedTargets(task('done', ['manage_ai_usage']))).toEqual([]);
+  });
+
   it('без права на действие перенос запрещён', () => {
     // Байер видит новую задачу, но взять её не может
     expect(dropAction(task('new', ['edit', 'cancel']), 'in_progress')).toBeNull();

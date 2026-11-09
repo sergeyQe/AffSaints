@@ -110,7 +110,11 @@ export function BoardPage() {
         opened={revision.task !== null}
         title={`Отправить на правки: ${revision.task?.offer ?? ''}`}
         label="Что исправить"
-        description="Комментарий увидит исполнитель; он же сохранится в истории задачи."
+        description={
+          revision.task?.status === 'done'
+            ? 'Работа уже принята. Задача вернётся исполнителю новым кругом правок и перестанет считаться завершённой.'
+            : 'Комментарий увидит исполнитель; он же сохранится в истории задачи.'
+        }
         confirm="Отправить на правки"
         color="orange"
         loading={revision.isPending}

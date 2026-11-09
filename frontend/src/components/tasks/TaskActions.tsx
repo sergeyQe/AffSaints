@@ -17,7 +17,7 @@ import { TextPromptModal } from '../common/TextPromptModal';
 import { ReassignModal } from './ReassignModal';
 
 /** Какое окно ввода открыто: комментарий правок, причина отмены, выбор исполнителя. */
-export type PromptKind = 'revision' | 'cancel' | 'assign' | 'reassign' | null;
+export type PromptKind = 'revision' | 'reopen' | 'cancel' | 'assign' | 'reassign' | null;
 
 interface Props {
   task: TaskDetail;
@@ -80,6 +80,16 @@ export function TaskActions({ task, onEdit, onResultRequired }: Props) {
             На правки
           </Button>
         )}
+        {can('reopen') && (
+          <Button
+            color="orange"
+            variant="light"
+            leftSection={<IconRepeat size={16} />}
+            onClick={() => setPrompt('reopen')}
+          >
+            Вернуть на правки
+          </Button>
+        )}
         {can('edit') && (
           <Button variant="default" leftSection={<IconEdit size={16} />} onClick={onEdit}>
             Редактировать ТЗ
@@ -127,6 +137,18 @@ export function TaskActions({ task, onEdit, onResultRequired }: Props) {
         loading={isPending}
         onClose={close}
         onSubmit={(comment) => run({ id: task.id, action: 'request-revision', comment }, close)}
+      />
+      <TextPromptModal
+        key={`reopen-${task.id}-${prompt === 'reopen'}`}
+        opened={prompt === 'reopen'}
+        title="Вернуть принятую работу на правки"
+        label="Что исправить"
+        description="Задача вернётся исполнителю новым кругом правок и перестанет считаться завершённой."
+        confirm="Вернуть на правки"
+        color="orange"
+        loading={isPending}
+        onClose={close}
+        onSubmit={(comment) => run({ id: task.id, action: 'reopen', comment }, close)}
       />
       <TextPromptModal
         key={`cancel-${task.id}-${prompt === 'cancel'}`}

@@ -177,7 +177,8 @@ STORIES: list[Story] = [
     Story("Pin-Up Casino", "BR", ST, 12, NORMAL, "anna", 4, 120,
           "Баннеры под ретаргет, тёмная и светлая версии.",
           [S(6, "take", "ivan"), S(28, "ai", "ivan", ("Midjourney", "55")), S(2, "submit", "ivan"),
-           S(10, "revision", "anna", "Поменяйте фон на тёмный и добавьте таймер акции")]),
+           S(4, "accept", "anna"),
+           S(6, "reopen", "head", "Поменяйте фон на тёмный и добавьте таймер акции")]),
     Story("Mostbet", "KZ", V, 3, URGENT, "dmitry", 2, 36,
           "Видео 9:16 под казахстанскую аудиторию, казахские субтитры.",
           [S(2, "take", "sergey"), S(8, "reassign", "head", "maria"),
@@ -277,6 +278,9 @@ class _Player:
     async def revision(self, actor: User, comment: str) -> None:
         await task_service.request_revision(self.session, self.task_id, actor, comment)
 
+    async def reopen(self, actor: User, comment: str) -> None:
+        await task_service.reopen(self.session, self.task_id, actor, comment)
+
     async def cancel(self, actor: User, reason: str) -> None:
         await task_service.cancel(self.session, self.task_id, actor, reason)
 
@@ -309,6 +313,7 @@ class _Player:
             "submit",
             "accept",
             "revision",
+            "reopen",
             "cancel",
             "reassign",
             "unassign",

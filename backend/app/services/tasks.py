@@ -35,6 +35,8 @@ def _ensure_future_deadline(deadline: datetime | None) -> None:
 
 
 async def _has_result_for_current_round(session: AsyncSession, task: Task) -> bool:
+    # Результат текущего круга, приложенный после взятия задачи: если задачу вернули
+    # в пул с проверки, работа прежнего исполнителя новому не засчитывается
     found = await session.scalar(
         select(TaskAttachment.id)
         .where(
@@ -42,6 +44,7 @@ async def _has_result_for_current_round(session: AsyncSession, task: Task) -> bo
             TaskAttachment.kind == AttachmentKind.RESULT.value,
             TaskAttachment.round == task.revision_count,
             TaskAttachment.deleted_at.is_(None),
+            TaskAttachment.created_at >= task.taken_at,
         )
         .limit(1)
     )
@@ -239,6 +242,33 @@ async def request_revision(session: AsyncSession, task_id: int, user: User, comm
     return task
 
 
+async def reopen(session: AsyncSession, task_id: int, user: User, comment: str) -> Task:
+    task = await lock_task(session, task_id)
+    ensure_allowed(Action.REOPEN, task, user)
+    assert task.assignee_id is not None  # гарантирует check-constraint статуса
+
+    # Принятая работа возвращается тому же исполнителю как новый круг правок;
+    # дата завершения снимается — задача снова открыта и в аналитике не «завершена»
+    now = clock.now()
+    previous = _set_status(task, TaskStatus.REVISION, now)
+    task.completed_at = None
+    task.revision_count += 1
+    task.revision_comment = comment
+    open_interval(session, task, task.assignee_id, WorkKind.REVISION, now)
+    add_event(
+        session,
+        task,
+        user,
+        EventType.REOPENED,
+        from_status=previous,
+        to_status=task.status,
+        comment=comment,
+        round=task.revision_count,
+    )
+    await session.commit()
+    return task
+
+
 async def cancel(session: AsyncSession, task_id: int, user: User, reason: str) -> Task:
     task = await lock_task(session, task_id)
     ensure_allowed(Action.CANCEL, task, user)
@@ -285,7 +315,8 @@ async def unassign(session: AsyncSession, task_id: int, user: User) -> Task:
     task = await lock_task(session, task_id)
     ensure_allowed(Action.UNASSIGN, task, user)
 
-    # Задача возвращается в общий пул; время прежнего исполнителя сохраняется
+    # Задача возвращается в общий пул (из работы, правок или с проверки);
+    # время прежнего исполнителя сохраняется, открытого отрезка на проверке нет
     now = clock.now()
     previous_assignee = task.assignee
     await close_interval(session, task, now)

@@ -57,6 +57,13 @@ def _assignee_or_head(task: Task, user: User) -> str | None:
     return "Действие доступно исполнителю задачи или руководителю"
 
 
+def _head_reviewer(task: Task, user: User) -> str | None:
+    # Вернуть принятую работу может только руководитель, и не свою собственную
+    if task.assignee_id == user.id:
+        return "Исполнитель не может сам проверять свою работу"
+    return _head(task, user)
+
+
 def _head(_: Task, user: User) -> str | None:
     return None if user.has_role(Role.HEAD) else "Действие доступно только руководителю"
 
@@ -93,8 +100,11 @@ RULES: dict[Action, Rule] = {
     Action.SUBMIT: Rule(frozenset({TaskStatus.IN_PROGRESS, TaskStatus.REVISION}), _assignee),
     Action.ACCEPT: Rule(frozenset({TaskStatus.REVIEW}), _reviewer),
     Action.REQUEST_REVISION: Rule(frozenset({TaskStatus.REVIEW}), _reviewer),
+    # Руководитель возвращает принятую работу на правки с комментарием
+    Action.REOPEN: Rule(frozenset({TaskStatus.DONE}), _head_reviewer),
     Action.REASSIGN: Rule(ACTIVE_STATUSES, _head),
-    Action.UNASSIGN: Rule(frozenset({TaskStatus.IN_PROGRESS, TaskStatus.REVISION}), _head),
+    # В пул — из работы, правок и с проверки (результат прежнего исполнителя новому не засчитывается)
+    Action.UNASSIGN: Rule(ACTIVE_STATUSES, _head),
     Action.ADD_REFERENCE: Rule(OPEN_STATUSES, _author_or_head),
     Action.ADD_RESULT: Rule(frozenset({TaskStatus.IN_PROGRESS, TaskStatus.REVISION}), _assignee),
     # Расходы: исполнитель до закрытия задачи; руководитель — всегда (решение №15)

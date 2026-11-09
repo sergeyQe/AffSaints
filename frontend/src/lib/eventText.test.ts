@@ -47,6 +47,13 @@ describe('describeEvent', () => {
     expect(text.details).toEqual(['Иван → Мария']);
   });
 
+  it('возврат принятой работы на правки', () => {
+    expect(describeEvent(event('reopened', { comment: 'Другой хук', round: 2 }))).toMatchObject({
+      title: 'Принятая работа возвращена на правки (круг 2)',
+      details: ['«Другой хук»'],
+    });
+  });
+
   it('назначение исполнителя руководителем', () => {
     expect(describeEvent(event('assigned', { to: { full_name: 'Мария' } }))).toMatchObject({
       title: 'Назначен исполнитель',

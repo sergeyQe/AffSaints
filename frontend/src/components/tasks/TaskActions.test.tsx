@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -66,6 +66,22 @@ describe('TaskActions', () => {
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({
       comment: 'Крупнее логотип',
     });
+  });
+
+  it('руководитель возвращает принятую работу на правки с комментарием', async () => {
+    const fetch = mockFetch({ 'POST /api/tasks/7/reopen': makeTask({ status: 'revision' }) });
+    renderActions(['reopen', 'manage_ai_usage'], 'done');
+    expect(buttons().filter(Boolean)).toEqual(['Вернуть на правки']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Вернуть на правки' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Вернуть принятую работу на правки' });
+    expect(dialog).toHaveTextContent('перестанет считаться завершённой');
+    await userEvent.type(screen.getByLabelText('Что исправить'), 'Другой хук');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Вернуть на правки' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(String(fetch.mock.calls[0]?.[0])).toContain('/tasks/7/reopen');
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({ comment: 'Другой хук' });
   });
 
   it('руководитель назначает исполнителя на новую задачу', async () => {

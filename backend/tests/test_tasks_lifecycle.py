@@ -410,15 +410,85 @@ async def test_unassign_returns_task_to_pool(as_user: AsUser, fake_clock: FakeCl
     assert t["work_seconds"] == 60 * 60
 
 
-async def test_unassign_not_allowed_in_review(as_user: AsUser) -> None:
+async def test_unassign_from_review_requires_new_result(
+    as_user: AsUser, fake_clock: FakeClock
+) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head = as_user(await create_user(Role.HEAD))
+    first = as_user(await create_user(Role.CREATIVE))
+    second = as_user(await create_user(Role.CREATIVE))
+    tid = (await create_task(buyer))["id"]
+    ok(await act(first, tid, "take"))
+    fake_clock.advance(minutes=30)
+    ok(await submit_work(first, tid))
+
+    # Байер вернуть в пул не может, руководитель — может и с проверки
+    assert (await act(buyer, tid, "unassign")).status_code == 403
+    t = ok(await act(head, tid, "unassign"))
+    assert t["status"] == "new"
+    assert t["assignee"] is None
+
+    # Результат прежнего исполнителя новому не засчитывается — нужен свой
+    fake_clock.advance(hours=1)
+    ok(await act(second, tid, "take"))
+    resp = await act(second, tid, "submit")
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "result_required"
+    fake_clock.advance(minutes=20)
+    t = ok(await submit_work(second, tid))
+    assert t["status"] == "review"
+    # Время обоих исполнителей сохранилось, ожидание проверки и пул не считаются
+    assert t["work_seconds"] == 50 * 60
+
+
+async def test_head_reopens_done_task_for_revision(as_user: AsUser, fake_clock: FakeClock) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head_user = await create_user(Role.HEAD)
+    head = as_user(head_user)
+    creative = as_user(await create_user(Role.CREATIVE))
+    tid = (await create_task(buyer))["id"]
+    ok(await act(creative, tid, "take"))
+    fake_clock.advance(hours=1)
+    ok(await submit_work(creative, tid))
+    ok(await act(buyer, tid, "accept"))
+    assert "reopen" in ok(await head.get(f"/api/tasks/{tid}"))["actions"]
+
+    # Только руководитель и только с комментарием
+    assert (await act(buyer, tid, "reopen", comment="Ещё раз")).status_code == 403
+    assert (await act(head, tid, "reopen", comment="")).status_code == 422
+
+    fake_clock.advance(days=2)
+    t = ok(await act(head, tid, "reopen", comment="Клиент просит другой хук"))
+    assert t["status"] == "revision"
+    assert t["completed_at"] is None
+    assert t["revision_count"] == 1
+    assert t["revision_comment"] == "Клиент просит другой хук"
+
+    # Исправление — новый круг: нужен новый результат, время правки считается
+    assert (await act(creative, tid, "submit")).status_code == 400
+    fake_clock.advance(minutes=30)
+    t = ok(await submit_work(creative, tid))
+    assert t["work_seconds"] == 90 * 60
+    t = ok(await act(buyer, tid, "accept"))
+    assert t["completed_at"] is not None
+
+    events = ok(await head.get(f"/api/tasks/{tid}/events"))
+    reopened = next(e for e in events if e["type"] == "reopened")
+    assert reopened["from_status"] == "done"
+    assert reopened["to_status"] == "revision"
+    assert reopened["payload"] == {"comment": "Клиент просит другой хук", "round": 1}
+    assert reopened["actor"]["id"] == head_user.id
+
+
+async def test_reopen_only_from_done(as_user: AsUser) -> None:
     buyer = as_user(await create_user(Role.BUYER))
     head = as_user(await create_user(Role.HEAD))
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await submit_work(creative, tid))
-
-    assert (await act(head, tid, "unassign")).status_code == 409
+    assert (await act(head, tid, "reopen", comment="x")).status_code == 409
+    ok(await act(buyer, tid, "cancel", reason="Не нужна"))
+    assert (await act(head, tid, "reopen", comment="x")).status_code == 409
 
 
 # ---------- доступные действия ----------

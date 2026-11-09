@@ -4,7 +4,7 @@ import { BOARD_COLUMNS } from './tasks';
 /** Действие, которое выполняется при перетаскивании карточки в колонку. */
 export type DropAction = Extract<
   TaskAction,
-  'take' | 'assign' | 'submit' | 'accept' | 'request_revision' | 'unassign'
+  'take' | 'assign' | 'submit' | 'accept' | 'request_revision' | 'reopen' | 'unassign'
 >;
 
 // Переходы доски: (из статуса, в колонку) → действие backend.
@@ -16,7 +16,9 @@ const TRANSITIONS: { from: TaskStatus[]; to: TaskStatus; action: DropAction }[] 
   { from: ['in_progress', 'revision'], to: 'review', action: 'submit' },
   { from: ['review'], to: 'done', action: 'accept' },
   { from: ['review'], to: 'revision', action: 'request_revision' },
-  { from: ['in_progress', 'revision'], to: 'new', action: 'unassign' },
+  // Руководитель: принятую работу — обратно на правки (с комментарием), любую активную — в пул
+  { from: ['done'], to: 'revision', action: 'reopen' },
+  { from: ['in_progress', 'review', 'revision'], to: 'new', action: 'unassign' },
 ];
 
 /**

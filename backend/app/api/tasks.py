@@ -151,6 +151,12 @@ async def request_revision(
     return await to_detail(session, task, user)
 
 
+@router.post("/{task_id}/reopen")
+async def reopen(task_id: int, body: CommentIn, session: Session, user: CurrentUser) -> TaskDetail:
+    task = await service.reopen(session, task_id, user, body.comment)
+    return await to_detail(session, task, user)
+
+
 @router.post("/{task_id}/cancel")
 async def cancel(task_id: int, body: ReasonIn, session: Session, user: CurrentUser) -> TaskDetail:
     task = await service.cancel(session, task_id, user, body.reason)

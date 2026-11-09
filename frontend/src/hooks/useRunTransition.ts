@@ -8,6 +8,7 @@ const SUCCESS_TEXT: Record<TransitionVars['action'], string> = {
   submit: 'Работа сдана на проверку',
   accept: 'Работа принята',
   'request-revision': 'Задача отправлена на правки',
+  reopen: 'Принятая работа возвращена на правки',
   cancel: 'Задача отменена',
   reassign: 'Исполнитель заменён',
   unassign: 'Задача возвращена в общий пул',

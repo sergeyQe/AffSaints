@@ -19,7 +19,7 @@ import { useRunTransition } from './useRunTransition';
  */
 export function useBoardDnd(onResultRequired: (taskId: number) => void) {
   const [dragged, setDragged] = useState<Task | null>(null);
-  // Правкам нужен комментарий — перенос в «Правки» открывает окно ввода
+  // Правкам нужен комментарий — перенос в «Правки» (с проверки или из «Готово») открывает окно ввода
   const [revisionFor, setRevisionFor] = useState<Task | null>(null);
   // Назначению нужен исполнитель — перенос руководителем открывает выбор креативщика
   const [assignFor, setAssignFor] = useState<Task | null>(null);
@@ -43,7 +43,7 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
     const action = dropAction(task, e.over.id as TaskStatus);
     if (!action) return;
     // Переходы, которым нужен ввод, сначала открывают окно
-    if (action === 'request_revision') {
+    if (action === 'request_revision' || action === 'reopen') {
       setRevisionFor(task);
       return;
     }
@@ -54,9 +54,17 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
     run({ id: task.id, action });
   };
 
+  // Из «Готово» — возврат принятой работы, с проверки — обычные правки
   const submitRevision = (comment: string) =>
     revisionFor &&
-    run({ id: revisionFor.id, action: 'request-revision', comment }, () => setRevisionFor(null));
+    run(
+      {
+        id: revisionFor.id,
+        action: revisionFor.status === 'done' ? 'reopen' : 'request-revision',
+        comment,
+      },
+      () => setRevisionFor(null),
+    );
 
   const submitAssign = (assigneeId: number) =>
     assignFor &&
