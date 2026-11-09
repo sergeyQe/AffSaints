@@ -33,6 +33,18 @@ async def act(client: AsyncClient, task_id: int, action: str, **body: Any) -> Re
     return await client.post(f"/api/tasks/{task_id}/{action}", json=body or None)
 
 
+async def submit_work(client: AsyncClient, task_id: int) -> Response:
+    """Сдать работу: приложить ссылку-результат текущего круга и нажать «Сдать».
+
+    Если приложить нельзя (не исполнитель, не тот статус), сдача вернёт ту же ошибку прав/статуса.
+    """
+    await client.post(
+        f"/api/tasks/{task_id}/attachments/link",
+        json={"kind": "result", "url": "https://drive.google.com/result"},
+    )
+    return await act(client, task_id, "submit")
+
+
 async def event_types(client: AsyncClient, task_id: int) -> list[str]:
     events = ok(await client.get(f"/api/tasks/{task_id}/events"))
     return [e["type"] for e in events]

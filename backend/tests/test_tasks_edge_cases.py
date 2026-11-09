@@ -13,7 +13,7 @@ from app.models.task import WorkInterval
 from app.models.user import Role, User
 from tests.conftest import FakeClock
 from tests.factories import create_user
-from tests.helpers import act, create_task, ok
+from tests.helpers import act, create_task, ok, submit_work
 
 AsUser = Callable[[User], AsyncClient]
 
@@ -41,7 +41,7 @@ async def test_moving_deadline_after_late_submit_keeps_late(
     tid = (await create_task(buyer, deadline=fake_clock.current + timedelta(hours=1)))["id"]
     ok(await act(creative, tid, "take"))
     fake_clock.advance(hours=2)
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
 
     new = (
         None
@@ -60,7 +60,7 @@ async def test_deadline_added_after_submit_does_not_create_lateness(
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
 
     soon = (fake_clock.current + timedelta(minutes=30)).isoformat()
     ok(await buyer.patch(f"/api/tasks/{tid}", json={"deadline": soon}))
@@ -79,7 +79,7 @@ async def test_moving_deadline_before_submit_counts(as_user: AsUser, fake_clock:
     ok(await buyer.patch(f"/api/tasks/{tid}", json={"deadline": later}))
     fake_clock.advance(hours=3)
 
-    assert ok(await act(creative, tid, "submit"))["overdue"] == "none"
+    assert ok(await submit_work(creative, tid))["overdue"] == "none"
 
 
 # ---------- А2-2: нельзя проверять собственную работу ----------
@@ -91,7 +91,7 @@ async def test_head_creative_cannot_review_own_work(as_user: AsUser) -> None:
     other_head = as_user(await create_user(Role.HEAD))
     tid = (await create_task(buyer))["id"]
     ok(await act(head_creative, tid, "take"))
-    ok(await act(head_creative, tid, "submit"))
+    ok(await submit_work(head_creative, tid))
 
     t = ok(await head_creative.get(f"/api/tasks/{tid}"))
     assert "accept" not in t["actions"]
@@ -159,7 +159,7 @@ async def test_explicit_done_status_ignores_done_days(
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
     ok(await act(buyer, tid, "accept"))
     fake_clock.advance(days=100)
 
@@ -191,7 +191,7 @@ async def test_cancel_from_review_and_revision(
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
     fake_clock.advance(hours=1)
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
     if stage == "revision":
         ok(await act(buyer, tid, "request-revision", comment="правки"))
         fake_clock.advance(minutes=30)
@@ -212,13 +212,13 @@ async def test_three_revision_rounds(as_user: AsUser, fake_clock: FakeClock) -> 
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
     fake_clock.advance(hours=4)
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
 
     for minutes in (60, 30, 15):
         fake_clock.advance(hours=2)  # ожидание проверки — не считается
         ok(await act(buyer, tid, "request-revision", comment=f"круг {minutes}"))
         fake_clock.advance(minutes=minutes)
-        ok(await act(creative, tid, "submit"))
+        ok(await submit_work(creative, tid))
 
     t = ok(await act(buyer, tid, "accept"))
     assert t["revision_count"] == 3
@@ -237,7 +237,7 @@ async def test_reassign_attributes_intervals_to_users(
     maria = await create_user(Role.CREATIVE)
     tid = (await create_task(buyer))["id"]
     ok(await act(as_user(ivan), tid, "take"))
-    ok(await act(as_user(ivan), tid, "submit"))
+    ok(await submit_work(as_user(ivan), tid))
     ok(await act(buyer, tid, "request-revision", comment="правки"))
 
     # Переназначение в «Правках»: тип открытого отрезка сохраняется
@@ -256,7 +256,7 @@ async def test_unassign_from_revision(as_user: AsUser) -> None:
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
     ok(await act(buyer, tid, "request-revision", comment="правки"))
 
     t = ok(await act(head, tid, "unassign"))
@@ -272,7 +272,7 @@ async def test_concurrent_accept_and_cancel(as_user: AsUser) -> None:
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
 
     accept, cancel = await asyncio.gather(
         act(buyer, tid, "accept"), act(head, tid, "cancel", reason="стоп")

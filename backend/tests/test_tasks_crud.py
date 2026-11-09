@@ -9,7 +9,7 @@ from httpx import AsyncClient
 from app.models.user import Role, User
 from tests.conftest import FakeClock
 from tests.factories import create_user
-from tests.helpers import BRIEF, act, create_task, event_types, ok
+from tests.helpers import BRIEF, act, create_task, event_types, ok, submit_work
 
 AsUser = Callable[[User], AsyncClient]
 
@@ -122,7 +122,7 @@ async def test_edit_permissions_and_closed_task(as_user: AsUser) -> None:
 
     # Редактирование возможно в любом статусе до «Готово» (решение №9)
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
     ok(await author.patch(f"/api/tasks/{tid}", json={"description": "Уточнение"}))
     ok(await act(author, tid, "accept"))
     resp = await author.patch(f"/api/tasks/{tid}", json={"quantity": 3})
@@ -150,10 +150,10 @@ async def test_overdue_states(as_user: AsUser, fake_clock: FakeClock) -> None:
     no_deadline = (await create_task(buyer, offer="Без срока"))["id"]
 
     ok(await act(creative, on_time, "take"))
-    ok(await act(creative, on_time, "submit"))
+    ok(await submit_work(creative, on_time))
     ok(await act(creative, late, "take"))
     fake_clock.advance(hours=3)
-    ok(await act(creative, late, "submit"))
+    ok(await submit_work(creative, late))
 
     async def overdue(tid: int) -> str:
         return str(ok(await buyer.get(f"/api/tasks/{tid}"))["overdue"])
@@ -166,7 +166,7 @@ async def test_overdue_states(as_user: AsUser, fake_clock: FakeClock) -> None:
     # Правки после сдачи в срок на просрочку не влияют
     ok(await act(buyer, on_time, "request-revision", comment="ещё"))
     fake_clock.advance(days=2)
-    ok(await act(creative, on_time, "submit"))
+    ok(await submit_work(creative, on_time))
     assert await overdue(on_time) == "none"
 
     # Фильтр «только текущие просрочки»
@@ -227,7 +227,7 @@ async def test_board_hides_old_done_tasks(as_user: AsUser, fake_clock: FakeClock
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
     ok(await act(buyer, tid, "accept"))
 
     assert len(ok(await buyer.get("/api/tasks"))) == 1

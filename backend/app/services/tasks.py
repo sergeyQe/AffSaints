@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
 from app.core.errors import AppError, NotFound
+from app.models.attachment import AttachmentKind, TaskAttachment
 from app.models.task import (
     BOARD_ORDER,
     EventType,
@@ -101,6 +102,20 @@ async def _close_interval(session: AsyncSession, task: Task, now: datetime) -> W
         # Сразу пишем в БД: уникальный индекс «один открытый отрезок» не должен увидеть два
         await session.flush()
     return interval
+
+
+async def _has_result_for_current_round(session: AsyncSession, task: Task) -> bool:
+    found = await session.scalar(
+        select(TaskAttachment.id)
+        .where(
+            TaskAttachment.task_id == task.id,
+            TaskAttachment.kind == AttachmentKind.RESULT.value,
+            TaskAttachment.round == task.revision_count,
+            TaskAttachment.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    return found is not None
 
 
 def _set_status(task: Task, status: TaskStatus, now: datetime) -> str:
@@ -291,6 +306,10 @@ async def take(session: AsyncSession, task_id: int, user: User) -> Task:
 async def submit(session: AsyncSession, task_id: int, user: User) -> Task:
     task = await lock_task(session, task_id)
     ensure_allowed(Action.SUBMIT, task, user)
+
+    # Сдать можно только с результатом текущего круга (после правок — с новым)
+    if not await _has_result_for_current_round(session, task):
+        raise AppError("result_required", "Прикрепите результат работы перед сдачей")
 
     now = clock.now()
     await _close_interval(session, task, now)

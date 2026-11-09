@@ -9,7 +9,7 @@ from httpx import AsyncClient
 from app.models.user import Role, User
 from tests.conftest import FakeClock
 from tests.factories import create_user
-from tests.helpers import act, create_task, event_types, ok
+from tests.helpers import act, create_task, event_types, ok, submit_work
 
 AsUser = Callable[[User], AsyncClient]
 
@@ -30,7 +30,7 @@ async def test_full_cycle_with_revision_counts_pure_work_time(
     assert t["status"] == "in_progress"
     fake_clock.advance(hours=2)
     first_submit = fake_clock.current
-    t = ok(await act(creative, tid, "submit"))
+    t = ok(await submit_work(creative, tid))
     assert t["status"] == "review"
 
     # Байер проверял 5 ч — это время не идёт в работу креативщика
@@ -42,7 +42,7 @@ async def test_full_cycle_with_revision_counts_pure_work_time(
 
     # Правка 1 ч → сдал исправленное → принято
     fake_clock.advance(hours=1)
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
     fake_clock.advance(hours=3)
     t = ok(await act(buyer, tid, "accept"))
 
@@ -50,7 +50,8 @@ async def test_full_cycle_with_revision_counts_pure_work_time(
     assert t["work_seconds"] == 3 * 3600
     assert t["first_submitted_at"].startswith(first_submit.isoformat()[:19])
     assert t["completed_at"] is not None
-    assert await event_types(buyer, tid) == [
+    transitions = [e for e in await event_types(buyer, tid) if not e.startswith("attachment")]
+    assert transitions == [
         "created",
         "taken",
         "submitted",
@@ -135,8 +136,8 @@ async def test_role_and_ownership_checks(as_user: AsUser) -> None:
 
     ok(await act(creative, tid, "take"))
     # Сдаёт только исполнитель
-    assert (await act(other_creative, tid, "submit")).status_code == 403
-    ok(await act(creative, tid, "submit"))
+    assert (await submit_work(other_creative, tid)).status_code == 403
+    ok(await submit_work(creative, tid))
 
     # Принимает только автор или руководитель
     assert (await act(other_buyer, tid, "accept")).status_code == 403
@@ -172,7 +173,7 @@ async def test_revision_requires_comment(as_user: AsUser) -> None:
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
 
     assert (await act(buyer, tid, "request-revision", comment="   ")).status_code == 422
     assert (await act(buyer, tid, "request-revision")).status_code == 422
@@ -184,10 +185,10 @@ async def test_head_can_do_everything_buyer_can(as_user: AsUser) -> None:
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
 
     ok(await act(head, tid, "request-revision", comment="Правки от руководителя"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
     ok(await act(head, tid, "accept"))
 
     # И создать свою задачу
@@ -234,7 +235,7 @@ async def test_cancel_rules(as_user: AsUser) -> None:
     assert (await act(creative, tid, "cancel", reason="x")).status_code == 403
 
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
     ok(await act(buyer, tid, "accept"))
     assert (await act(buyer, tid, "cancel", reason="поздно")).status_code == 409
 
@@ -266,9 +267,9 @@ async def test_reassign_moves_open_interval_to_new_assignee(
     assert t["status"] == "in_progress"
 
     # Иван больше не может сдать, Мария — может
-    assert (await act(as_user(ivan), tid, "submit")).status_code == 403
+    assert (await submit_work(as_user(ivan), tid)).status_code == 403
     fake_clock.advance(hours=1)
-    t = ok(await act(as_user(maria), tid, "submit"))
+    t = ok(await submit_work(as_user(maria), tid))
     assert t["work_seconds"] == 3 * 3600
 
     events = ok(await head.get(f"/api/tasks/{tid}/events"))
@@ -284,7 +285,7 @@ async def test_reassign_in_review_keeps_status(as_user: AsUser) -> None:
     other = await create_user(Role.CREATIVE)
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
 
     t = ok(await act(head, tid, "reassign", assignee_id=other.id))
 
@@ -331,7 +332,7 @@ async def test_unassign_returns_task_to_pool(as_user: AsUser, fake_clock: FakeCl
     fake_clock.advance(hours=3)
     ok(await act(second, tid, "take"))
     fake_clock.advance(minutes=20)
-    t = ok(await act(second, tid, "submit"))
+    t = ok(await submit_work(second, tid))
     # Время первого исполнителя сохранилось, простой в пуле не считается
     assert t["work_seconds"] == 60 * 60
 
@@ -342,7 +343,7 @@ async def test_unassign_not_allowed_in_review(as_user: AsUser) -> None:
     creative = as_user(await create_user(Role.CREATIVE))
     tid = (await create_task(buyer))["id"]
     ok(await act(creative, tid, "take"))
-    ok(await act(creative, tid, "submit"))
+    ok(await submit_work(creative, tid))
 
     assert (await act(head, tid, "unassign")).status_code == 409
 
