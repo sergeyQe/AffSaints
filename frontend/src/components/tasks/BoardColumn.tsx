@@ -21,6 +21,7 @@ function DraggableCard({ task, onOpen }: { task: Task; onOpen: (id: number) => v
     <div ref={setNodeRef} style={{ opacity: isDragging ? 0.35 : 1 }}>
       <TaskCard
         task={task}
+        draggable={canDrag}
         {...dragProps}
         onClick={() => onOpen(task.id)}
         // Enter открывает карточку, остальные клавиши (пробел — перенос) отдаём dnd-kit

@@ -1,6 +1,7 @@
 import {
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -23,8 +24,10 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
   const { run, isPending } = useRunTransition(onResultRequired);
 
   const sensors = useSensors(
-    // Небольшой порог: простой клик открывает карточку, а не начинает перетаскивание
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // Мышь: небольшой порог — простой клик открывает карточку, а не начинает перетаскивание
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    // Палец: перетаскивание после удержания 250 мс; короткое движение остаётся прокруткой доски
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   );
 

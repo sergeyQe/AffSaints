@@ -47,3 +47,19 @@ describe('TaskCard', () => {
     expect(screen.getByText('Сдана с опозданием')).toBeInTheDocument();
   });
 });
+
+describe('TaskCard — перетаскиваемость видна', () => {
+  it('перетаскиваемая карточка помечена и показывает значок захвата', () => {
+    renderWithProviders(<TaskCard task={makeTask()} draggable />);
+    const card = screen.getByLabelText('Задача 7: Vavada Casino');
+    expect(card).toHaveAttribute('data-draggable');
+    expect(card.querySelector('.tabler-icon-grip-vertical')).not.toBeNull();
+  });
+
+  it('неперетаскиваемая — без пометки и значка', () => {
+    renderWithProviders(<TaskCard task={makeTask()} />);
+    const card = screen.getByLabelText('Задача 7: Vavada Casino');
+    expect(card).not.toHaveAttribute('data-draggable');
+    expect(card.querySelector('.tabler-icon-grip-vertical')).toBeNull();
+  });
+});

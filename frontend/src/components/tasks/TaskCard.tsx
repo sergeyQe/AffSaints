@@ -1,5 +1,11 @@
 import { Avatar, Badge, Group, Paper, Stack, Text, Tooltip } from '@mantine/core';
-import { IconAlertTriangle, IconClock, IconEdit, IconRepeat } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconClock,
+  IconEdit,
+  IconGripVertical,
+  IconRepeat,
+} from '@tabler/icons-react';
 import type { CSSProperties, HTMLAttributes } from 'react';
 
 import type { Task } from '../../api/tasks';
@@ -14,13 +20,15 @@ import {
 } from '../../lib/tasks';
 import classes from './TaskCard.module.css';
 
-interface Props extends HTMLAttributes<HTMLDivElement> {
+interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'draggable'> {
   task: Task;
   dragging?: boolean;
+  /** Карточку можно перетащить — показываем курсор «рука» и значок захвата. */
+  draggable?: boolean;
   style?: CSSProperties;
 }
 
-export function TaskCard({ task, dragging, style, ...rest }: Props) {
+export function TaskCard({ task, dragging, draggable, style, ...rest }: Props) {
   // ТЗ правили после взятия в работу — показываем исполнителю пометку
   const briefChanged = task.brief_updated_at !== null && task.assignee !== null;
   const deadlineColor = task.overdue === 'current' ? 'red' : 'dimmed';
@@ -33,6 +41,7 @@ export function TaskCard({ task, dragging, style, ...rest }: Props) {
       className={classes.card}
       data-overdue={task.overdue === 'current' || undefined}
       data-dragging={dragging || undefined}
+      data-draggable={draggable || undefined}
       style={style}
       aria-label={`Задача ${task.id}: ${task.offer}`}
       {...rest}
@@ -42,9 +51,16 @@ export function TaskCard({ task, dragging, style, ...rest }: Props) {
           <Badge size="xs" color={PRIORITY_COLORS[task.priority]} variant="light">
             {PRIORITY_LABELS[task.priority]}
           </Badge>
-          <Text size="xs" c="dimmed">
-            #{task.id}
-          </Text>
+          <Group gap={2} wrap="nowrap">
+            <Text size="xs" c="dimmed">
+              #{task.id}
+            </Text>
+            {draggable && (
+              <Tooltip label="Можно перетащить в другую колонку">
+                <IconGripVertical size={14} className={classes.grip} aria-hidden />
+              </Tooltip>
+            )}
+          </Group>
         </Group>
 
         <Text fw={600} size="sm" lineClamp={2}>

@@ -15,9 +15,18 @@
     border-left: 3px solid var(--mantine-color-red-6);
   }
 
+  /* Перетаскиваемая карточка: курсор «рука» */
+  &[data-draggable] {
+    cursor: grab;
+  }
+
   &[data-dragging] {
     box-shadow: var(--mantine-shadow-lg);
     cursor: grabbing;
     transform: rotate(1.5deg);
   }
+}
+
+.grip {
+  color: var(--mantine-color-gray-5);
 }
