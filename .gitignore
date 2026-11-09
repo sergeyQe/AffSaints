@@ -1,31 +1,63 @@
-# Окружение
+# ---------- Секреты и окружение ----------
+# Любые .env-файлы (локальные, прод), кроме примеров
 .env
-.env.prod
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# ---------- Python (backend) ----------
 .venv/
 venv/
-
-# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.egg-info/
 build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+.tox/
+
+# Загруженные файлы и временные части загрузок
 backend/data/
 backend/tests/.uploads/
+*.part
 
-# Node
+# ---------- Node (frontend, e2e) ----------
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
+.vite/
+.eslintcache
+npm-debug.log*
 
-# Playwright
+# ---------- Playwright ----------
 e2e/test-results/
 e2e/playwright-report/
+e2e/blob-report/
 e2e/.auth/
+e2e/.cache/
 
-# IDE
+# ---------- Логи и дампы ----------
+*.log
+*.sql.gz
+*.dump
+
+# ---------- IDE ----------
 .idea/
+*.iml
 .vscode/
+.fleet/
 *.swp
+*~
+
+# ---------- Системные файлы ОС ----------
+.DS_Store
+Thumbs.db
+desktop.ini
