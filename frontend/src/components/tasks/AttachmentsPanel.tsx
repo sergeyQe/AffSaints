@@ -129,6 +129,9 @@ function AddAttachment({ taskId, kind }: { taskId: number; kind: AttachmentKind 
           })
         }
         maxSize={MAX_FILE_BYTES}
+        inputProps={{
+          'aria-label': kind === 'result' ? 'Загрузить результат' : 'Загрузить референс',
+        }}
         accept={ACCEPTED_MIME}
         loading={mutation.isPending}
         p="md"

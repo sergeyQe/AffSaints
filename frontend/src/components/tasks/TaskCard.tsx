@@ -75,6 +75,7 @@ export function TaskCard({ task, dragging, style, ...rest }: Props) {
                 size="xs"
                 color="orange"
                 variant="light"
+                aria-label={`Кругов правок: ${task.revision_count}`}
                 leftSection={<IconRepeat size={10} />}
               >
                 {task.revision_count}

@@ -14,13 +14,14 @@ function DraggableCard({ task, onOpen }: { task: Task; onOpen: (id: number) => v
     data: { task },
     disabled: !canDrag,
   });
+  // Без доступных переносов атрибуты dnd-kit не нужны: он пометил бы карточку aria-disabled,
+  // и скринридер объявил бы её недоступной, хотя она открывается
+  const dragProps = canDrag ? { ...attributes, ...listeners } : { role: 'button', tabIndex: 0 };
   return (
     <div ref={setNodeRef} style={{ opacity: isDragging ? 0.35 : 1 }}>
       <TaskCard
         task={task}
-        {...attributes}
-        {...listeners}
-        style={canDrag ? undefined : { cursor: 'pointer' }}
+        {...dragProps}
         onClick={() => onOpen(task.id)}
         // Enter открывает карточку, остальные клавиши (пробел — перенос) отдаём dnd-kit
         onKeyDown={(e) => {
@@ -28,7 +29,7 @@ function DraggableCard({ task, onOpen }: { task: Task; onOpen: (id: number) => v
             onOpen(task.id);
             return;
           }
-          listeners?.onKeyDown?.(e);
+          if (canDrag) listeners?.onKeyDown?.(e);
         }}
       />
     </div>

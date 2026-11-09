@@ -1,13 +1,10 @@
-import { MantineProvider } from '@mantine/core';
-import { ModalsProvider } from '@mantine/modals';
-import { Notifications } from '@mantine/notifications';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { vi } from 'vitest';
 
-import { theme } from '../theme';
+import { AppProviders } from '../providers';
 
 export function createTestQueryClient() {
   return new QueryClient({
@@ -31,21 +28,17 @@ export function renderWithProviders(ui: ReactElement, options: Options = {}) {
     queryClient = createTestQueryClient(),
   } = options;
   const result = render(
-    <QueryClientProvider client={queryClient}>
-      <MantineProvider theme={theme}>
-        <ModalsProvider>
-          <Notifications />
-          <MemoryRouter initialEntries={[route]}>
-            <Routes>
-              <Route path={path} element={ui} />
-              {Object.entries(extraRoutes).map(([p, el]) => (
-                <Route key={p} path={p} element={el} />
-              ))}
-            </Routes>
-          </MemoryRouter>
-        </ModalsProvider>
-      </MantineProvider>
-    </QueryClientProvider>,
+    // Те же провайдеры, что и в приложении (тема, локаль календарей)
+    <AppProviders client={queryClient}>
+      <MemoryRouter initialEntries={[route]}>
+        <Routes>
+          <Route path={path} element={ui} />
+          {Object.entries(extraRoutes).map(([p, el]) => (
+            <Route key={p} path={p} element={el} />
+          ))}
+        </Routes>
+      </MemoryRouter>
+    </AppProviders>,
   );
   return { ...result, queryClient };
 }
