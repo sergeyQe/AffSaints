@@ -241,3 +241,17 @@ async def test_link_download_is_404(as_user: AsUser) -> None:
     tid = (await create_task(buyer))["id"]
     item = ok(await add_link(buyer, tid, "https://x.com/ref"), 201)
     assert (await buyer.get(f"/api/attachments/{item['id']}/file")).status_code == 404
+
+
+def test_storage_clear_removes_only_storage_files(tmp_path: Path) -> None:
+    from app.services.storage import LocalFileStorage
+
+    storage = LocalFileStorage(tmp_path)
+    stored = storage.save(io.BytesIO(PNG), 10_000)
+    keep = tmp_path / "readme.txt"
+    keep.write_text("не трогать")
+
+    storage.clear()
+
+    assert not storage.path(stored.key).exists()
+    assert keep.exists()

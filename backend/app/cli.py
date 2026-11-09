@@ -6,6 +6,7 @@ import sys
 
 from app.core.db import SessionFactory, engine
 from app.seed import is_empty, seed, wipe
+from app.services.storage import get_storage
 
 
 async def _seed(if_empty: bool, reset: bool) -> str:
@@ -15,6 +16,8 @@ async def _seed(if_empty: bool, reset: bool) -> str:
             if reset:
                 await wipe(session)
                 await session.commit()
+                # Файлы удалённых вложений больше не нужны
+                await asyncio.to_thread(get_storage().clear)
             elif not await is_empty(session):
                 if if_empty:
                     return "seed: БД не пуста, пропускаем"

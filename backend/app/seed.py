@@ -1,4 +1,4 @@
-"""Демо-данные: тестовые пользователи (задачи и расходы добавляются на этапе 7)."""
+"""Демо-данные: тестовые пользователи, AI-сервисы, задачи во всех статусах с историей и расходами."""
 
 from dataclasses import dataclass
 
@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import Base
 from app.core.security import hash_password
+from app.demo_content import seed_content
 from app.models.user import Role, User, UserRole
 
 DEMO_PASSWORD = "demo12345"
@@ -55,4 +56,7 @@ async def seed(session: AsyncSession) -> dict[str, User]:
     }
     session.add_all(users.values())
     await session.commit()
+
+    # Задачи, расходы и история — через бизнес-сервисы, как в реальной работе
+    await seed_content(session, users)
     return users

@@ -49,6 +49,8 @@ class FileStorage(Protocol):
 
     def delete(self, key: str) -> None: ...
 
+    def clear(self) -> None: ...
+
 
 class LocalFileStorage:
     def __init__(self, base_dir: str | Path) -> None:
@@ -104,6 +106,12 @@ class LocalFileStorage:
 
     def delete(self, key: str) -> None:
         self._target(key).unlink(missing_ok=True)
+
+    def clear(self) -> None:
+        # Удаляем только файлы хранилища (каталоги вида ab/<32 hex>), сам каталог не трогаем
+        for path in self.base.glob("??/*"):
+            if path.is_file() and re.fullmatch(r"[a-f0-9]{32}(\.part)?", path.name):
+                path.unlink(missing_ok=True)
 
 
 def get_storage() -> FileStorage:
