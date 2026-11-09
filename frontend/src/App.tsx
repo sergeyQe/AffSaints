@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 
 import { AppLayout } from './components/AppLayout';
+import { AiServicesPage } from './pages/AiServicesPage';
 import { RequireAuth } from './components/RequireAuth';
 import { BoardPage } from './pages/BoardPage';
 import { NotFoundPage } from './pages/ForbiddenPage';
@@ -18,6 +19,10 @@ export function App() {
           element={
             <RequireAuth roles={['head']}>{(user) => <UsersPage currentUser={user} />}</RequireAuth>
           }
+        />
+        <Route
+          path="ai-services"
+          element={<RequireAuth roles={['head']}>{() => <AiServicesPage />}</RequireAuth>}
         />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

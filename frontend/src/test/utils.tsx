@@ -56,7 +56,7 @@ type Handler = (init: RequestInit | undefined, url: URL) => unknown;
  * Мок fetch по таблице "МЕТОД /api/путь" → ответ.
  * Ответ-функция может вернуть Response (для ошибок) или данные для JSON 200.
  */
-export function mockFetch(routes: Record<string, unknown | Handler>) {
+export function mockFetch(routes: Record<string, Handler | Response | object | null | undefined>) {
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://localhost');
     const key = `${init?.method ?? 'GET'} ${url.pathname}`;
