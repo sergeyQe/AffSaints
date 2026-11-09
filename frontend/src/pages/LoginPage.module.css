@@ -1,0 +1,22 @@
+.page {
+  background: linear-gradient(135deg, var(--mantine-color-violet-0), var(--mantine-color-gray-0));
+}
+
+.demoButton {
+  padding: var(--mantine-spacing-sm);
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: var(--mantine-radius-md);
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--mantine-color-violet-4);
+    background-color: var(--mantine-color-violet-0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}

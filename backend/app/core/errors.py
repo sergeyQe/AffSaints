@@ -3,6 +3,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.validation_messages import translate
+
 
 class AppError(Exception):
     """Бизнес-ошибка с машинным кодом. Отдаётся клиенту как {"error": {"code", "message"}}."""
@@ -49,7 +51,7 @@ def register_error_handlers(app: FastAPI) -> None:
     async def validation_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
         # Отдаём только поле и текст, без входных значений (могут содержать пароль)
         details = [
-            {"field": ".".join(str(p) for p in e["loc"][1:]), "message": e["msg"]}
+            {"field": ".".join(str(p) for p in e["loc"][1:]), "message": translate(e)}
             for e in exc.errors()
         ]
         return _error(422, "validation_error", "Проверьте заполнение полей", details)

@@ -1,22 +1,26 @@
-import { Center, Stack, Text, Title } from '@mantine/core';
-import { useQuery } from '@tanstack/react-query';
+import { Route, Routes } from 'react-router-dom';
 
-import { api } from './api/client';
+import { AppLayout } from './components/AppLayout';
+import { RequireAuth } from './components/RequireAuth';
+import { BoardPage } from './pages/BoardPage';
+import { NotFoundPage } from './pages/ForbiddenPage';
+import { LoginPage } from './pages/LoginPage';
+import { UsersPage } from './pages/UsersPage';
 
 export function App() {
-  const health = useQuery({
-    queryKey: ['health'],
-    queryFn: () => api<{ status: string }>('/health'),
-  });
-
   return (
-    <Center h="100vh">
-      <Stack align="center" gap="xs">
-        <Title order={2}>Креативный отдел</Title>
-        <Text c="dimmed">
-          Backend: {health.isPending ? 'проверка…' : health.isError ? 'недоступен' : 'работает'}
-        </Text>
-      </Stack>
-    </Center>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<RequireAuth>{(user) => <AppLayout user={user} />}</RequireAuth>}>
+        <Route index element={<BoardPage />} />
+        <Route
+          path="users"
+          element={
+            <RequireAuth roles={['head']}>{(user) => <UsersPage currentUser={user} />}</RequireAuth>
+          }
+        />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
   );
 }

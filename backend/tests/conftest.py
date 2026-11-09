@@ -14,14 +14,21 @@ TEST_DB_URL = os.environ.setdefault(
 )
 os.environ["APP_DATABASE_URL"] = TEST_DB_URL
 os.environ.setdefault("APP_UPLOAD_DIR", str(Path(__file__).parent / ".uploads"))
+os.environ["APP_BCRYPT_ROUNDS"] = "4"
+os.environ["APP_DEMO_MODE"] = "true"
+
+from collections.abc import Callable  # noqa: E402
 
 import asyncpg  # noqa: E402
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from app.core.config import get_settings  # noqa: E402
 from app.core.db import Base, engine  # noqa: E402
+from app.core.security import create_access_token, login_throttle  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.models.user import User  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -62,8 +69,31 @@ async def _clean_tables() -> None:
             await conn.execute(text(f"truncate {', '.join(tables)} restart identity cascade"))
 
 
+@pytest.fixture(autouse=True)
+def _reset_login_throttle() -> None:
+    login_throttle._failures.clear()
+
+
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
+    """Анонимный клиент."""
     app = create_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+@pytest.fixture
+async def as_user() -> AsyncIterator[Callable[[User], AsyncClient]]:
+    """Фабрика клиентов, авторизованных под заданным пользователем (кука с JWT)."""
+    app = create_app()
+    clients: list[AsyncClient] = []
+
+    def make(user: User) -> AsyncClient:
+        c = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+        c.cookies.set(get_settings().cookie_name, create_access_token(user.id, user.token_version))
+        clients.append(c)
+        return c
+
+    yield make
+    for c in clients:
+        await c.aclose()
