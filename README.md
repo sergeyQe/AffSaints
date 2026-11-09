@@ -94,7 +94,7 @@ docs/      решения, журнал AI-инструментов, скрин�
 | Уровень | Инструмент | Тестов |
 |---|---|---|
 | Backend | pytest на настоящем PostgreSQL (схема — через миграции) | 160 |
-| Frontend | Vitest + Testing Library | 88 |
+| Frontend | Vitest + Testing Library | 90 |
 | Сквозные | Playwright | 2 сценария |
 
 Линтеры и типы: ruff + mypy (strict), ESLint + Prettier + TypeScript strict. Всё запускается в GitHub Actions на каждый push; e2e — на одноразовом стенде Docker Compose.
