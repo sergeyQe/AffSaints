@@ -21,6 +21,7 @@ import { useState } from 'react';
 
 import { uploadReferences } from '../../api/attachments';
 import { useCreateTask, useUpdateTask, type TaskBrief, type TaskDetail } from '../../api/tasks';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { notifyError, notifySuccess } from '../../lib/notify';
 import {
   diffBrief,
@@ -48,6 +49,7 @@ interface Props {
 
 export function TaskFormModal({ task, onClose, onCreated }: Props) {
   const isNew = task === null;
+  const isMobile = useIsMobile();
   const create = useCreateTask();
   const update = useUpdateTask();
   const [confirmNoDeadline, setConfirmNoDeadline] = useState<TaskBrief | null>(null);
@@ -123,6 +125,8 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
         onClose={onClose}
         title={isNew ? 'Новое ТЗ' : `Редактирование ТЗ #${task.id}`}
         size="lg"
+        // На телефоне форма на весь экран — иначе поля и переключатель приоритета не помещаются
+        fullScreen={isMobile}
       >
         <form onSubmit={form.onSubmit(submit)}>
           <Stack>
@@ -161,6 +165,7 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
               </Text>
               <SegmentedControl
                 fullWidth
+                size={isMobile ? 'xs' : 'sm'}
                 data={toOptions(PRIORITY_LABELS)}
                 {...form.getInputProps('priority')}
               />
@@ -180,7 +185,7 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
                 {QUICK_DEADLINES.map((q) => (
                   <Button
                     key={q.label}
-                    size="compact-xs"
+                    size="xs"
                     variant="light"
                     onClick={() => form.setFieldValue('deadline', quickDeadline(q.days))}
                   >

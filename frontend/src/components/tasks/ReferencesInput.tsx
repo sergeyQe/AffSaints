@@ -51,7 +51,8 @@ export function ReferencesInput({ value, onChange }: Props) {
       <Text size="sm" fw={500}>
         Референсы
       </Text>
-      <Group gap="xs" wrap="nowrap" align="flex-start">
+      {/* На узком экране поле занимает всю строку, кнопки переносятся под него */}
+      <Group gap="xs" wrap="wrap" align="flex-start">
         <TextInput
           placeholder="https://www.tiktok.com/…"
           aria-label="Ссылка на референс"
@@ -65,7 +66,7 @@ export function ReferencesInput({ value, onChange }: Props) {
             }
           }}
           leftSection={<IconLink size={14} />}
-          style={{ flex: 1 }}
+          style={{ flex: '1 1 220px' }}
         />
         <Button variant="light" onClick={addLink}>
           Добавить ссылку
@@ -93,7 +94,7 @@ export function ReferencesInput({ value, onChange }: Props) {
           <ActionIcon
             variant="subtle"
             color="gray"
-            size="sm"
+            size="md"
             aria-label={`Убрать ${link}`}
             onClick={() => onChange({ ...value, links: value.links.filter((l) => l !== link) })}
           >
@@ -113,7 +114,7 @@ export function ReferencesInput({ value, onChange }: Props) {
           <ActionIcon
             variant="subtle"
             color="gray"
-            size="sm"
+            size="md"
             aria-label={`Убрать ${file.name}`}
             onClick={() => onChange({ ...value, files: value.files.filter((_, j) => j !== i) })}
           >

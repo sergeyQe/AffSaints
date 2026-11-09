@@ -184,7 +184,7 @@ export function AiUsagePanel({ task }: { task: TaskDetail }) {
                           <Tooltip label="Изменить">
                             <ActionIcon
                               variant="subtle"
-                              size="sm"
+                              size="md"
                               onClick={() => setEditingId(u.id)}
                               aria-label="Изменить расход"
                             >
@@ -195,7 +195,7 @@ export function AiUsagePanel({ task }: { task: TaskDetail }) {
                             <ActionIcon
                               variant="subtle"
                               color="red"
-                              size="sm"
+                              size="md"
                               aria-label="Удалить расход"
                               onClick={() =>
                                 mutation.mutate(

@@ -25,6 +25,7 @@ import { SummaryTiles } from '../components/analytics/SummaryTiles';
 import { TimelineChart } from '../components/analytics/TimelineChart';
 import { Section } from '../components/analytics/ui';
 import { WorkloadSection } from '../components/analytics/WorkloadSection';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { errorMessage } from '../lib/notify';
 import {
   browserTimezone,
@@ -35,7 +36,14 @@ import {
   type PeriodPreset,
 } from '../lib/period';
 
+const PERIOD_OPTIONS = [
+  ...Object.entries(PRESET_LABELS).map(([value, label]) => ({ value, label })),
+  { value: 'custom', label: 'Период…' },
+];
+
 export function AnalyticsPage() {
+  // На телефоне пять вариантов периода не помещаются в переключатель — показываем список
+  const isMobile = useIsMobile();
   const [preset, setPreset] = useState<PeriodPreset>('month');
   const [range, setRange] = useState<[string | null, string | null]>([null, null]);
   const [buyerId, setBuyerId] = useState<string | null>(null);
@@ -76,14 +84,22 @@ export function AnalyticsPage() {
       </Group>
 
       <Group gap="xs" wrap="wrap">
-        <SegmentedControl
-          value={preset}
-          onChange={(v) => setPreset(v as PeriodPreset)}
-          data={[
-            ...Object.entries(PRESET_LABELS).map(([value, label]) => ({ value, label })),
-            { value: 'custom', label: 'Период…' },
-          ]}
-        />
+        {isMobile ? (
+          <Select
+            aria-label="Период"
+            data={PERIOD_OPTIONS}
+            value={preset}
+            onChange={(v) => v && setPreset(v as PeriodPreset)}
+            allowDeselect={false}
+            w="100%"
+          />
+        ) : (
+          <SegmentedControl
+            value={preset}
+            onChange={(v) => setPreset(v as PeriodPreset)}
+            data={PERIOD_OPTIONS}
+          />
+        )}
         {preset === 'custom' && (
           <DatePickerInput
             type="range"

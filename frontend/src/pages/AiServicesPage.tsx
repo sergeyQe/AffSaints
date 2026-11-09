@@ -71,7 +71,7 @@ function ServiceRow({ service }: { service: AiService }) {
             <Tooltip label="Переименовать">
               <ActionIcon
                 variant="subtle"
-                size="sm"
+                size="md"
                 onClick={() => setEditing(true)}
                 aria-label={`Переименовать ${service.name}`}
               >
@@ -94,6 +94,7 @@ function ServiceRow({ service }: { service: AiService }) {
       </Table.Td>
       <Table.Td>
         <Switch
+          size="md"
           checked={service.is_active}
           disabled={save.isPending}
           aria-label={`Доступен ${service.name}`}

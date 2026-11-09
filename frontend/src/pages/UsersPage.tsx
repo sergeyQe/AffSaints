@@ -170,7 +170,12 @@ export function UsersPage({ currentUser }: { currentUser: User }) {
           </Table.Thead>
           <Table.Tbody>
             {users.data?.map((u) => (
-              <Table.Tr key={u.id}>
+              <Table.Tr
+                key={u.id}
+                // На телефоне кнопка редактирования уходит за край таблицы — строка открывает её сама
+                style={{ cursor: 'pointer' }}
+                onClick={() => setEditing(u)}
+              >
                 <Table.Td>
                   <Text size="sm" fw={500}>
                     {u.full_name}

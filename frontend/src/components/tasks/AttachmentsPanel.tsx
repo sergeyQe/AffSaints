@@ -90,7 +90,7 @@ function AttachmentItem({
               <ActionIcon
                 variant="subtle"
                 color="red"
-                size="sm"
+                size="md"
                 onClick={onRemove}
                 aria-label={`Удалить ${a.filename ?? a.url}`}
               >

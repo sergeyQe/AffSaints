@@ -94,6 +94,7 @@ export function BoardFilters({ value, onChange }: Props) {
         w={140}
       />
       <Switch
+        size="md"
         label="Только просроченные"
         checked={!!value.overdue}
         onChange={(e) => set({ overdue: e.currentTarget.checked || undefined })}
