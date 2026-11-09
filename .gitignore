@@ -1,0 +1,30 @@
+# Окружение
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backend/data/
+backend/tests/.uploads/
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Playwright
+e2e/test-results/
+e2e/playwright-report/
+e2e/.auth/
+
+# IDE
+.idea/
+.vscode/
+*.swp

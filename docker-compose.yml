@@ -1,0 +1,50 @@
+# Локальный запуск всего стенда: docker compose up --build
+# Сервис доступен на http://localhost:8180 (порт меняется через FRONTEND_PORT в .env)
+name: affsaints
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: affsaints
+      POSTGRES_USER: affsaints
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-affsaints}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      # Наружу только на localhost — для локальных тестов backend
+      - "127.0.0.1:${DB_PORT:-5440}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U affsaints -d affsaints"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      APP_DATABASE_URL: postgresql+asyncpg://affsaints:${POSTGRES_PASSWORD:-affsaints}@db:5432/affsaints
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-dev-secret-change-me-in-production-0123456789}
+      APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-false}
+      APP_DEMO_MODE: ${APP_DEMO_MODE:-true}
+      APP_SEED_ON_START: ${APP_SEED_ON_START:-1}
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8100}:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8180}:80"
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  uploads:
