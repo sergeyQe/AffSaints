@@ -1,11 +1,16 @@
 import { expect, type Browser, type Page } from '@playwright/test';
 
-/** Новый контекст браузера (свои куки) и вход кнопкой демо-пользователя. */
-export async function loginAs(browser: Browser, fullName: string): Promise<Page> {
+/** Пароль тестовых пользователей из сида (он же указан в README). */
+export const DEMO_PASSWORD = 'demo12345';
+
+/** Новый контекст браузера (свои куки) и вход через форму — как настоящий пользователь. */
+export async function loginAs(browser: Browser, login: string): Promise<Page> {
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto('/login');
-  await page.getByRole('button', { name: `Войти как ${fullName}` }).click();
+  await page.getByLabel('Логин').fill(login);
+  await page.getByLabel('Пароль', { exact: true }).fill(DEMO_PASSWORD);
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Доска задач' })).toBeVisible();
   return page;
 }

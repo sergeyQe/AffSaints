@@ -15,7 +15,7 @@ services:
       APP_DATABASE_URL: postgresql+asyncpg://affsaints:${POSTGRES_PASSWORD}@db:5432/affsaints
       APP_JWT_SECRET: ${APP_JWT_SECRET:?Задайте APP_JWT_SECRET (не короче 32 символов)}
       APP_COOKIE_SECURE: "true"
-      APP_DEMO_MODE: ${APP_DEMO_MODE:-true}
+      APP_DEMO_MODE: ${APP_DEMO_MODE:-false}
       APP_SEED_ON_START: "1"
     ports: !reset []
 

@@ -26,7 +26,7 @@ services:
       APP_DATABASE_URL: postgresql+asyncpg://affsaints:${POSTGRES_PASSWORD:-affsaints}@db:5432/affsaints
       APP_JWT_SECRET: ${APP_JWT_SECRET:-dev-secret-change-me-in-production-0123456789}
       APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-false}
-      APP_DEMO_MODE: ${APP_DEMO_MODE:-true}
+      APP_DEMO_MODE: ${APP_DEMO_MODE:-false}
       APP_SEED_ON_START: ${APP_SEED_ON_START:-1}
     volumes:
       - uploads:/data/uploads

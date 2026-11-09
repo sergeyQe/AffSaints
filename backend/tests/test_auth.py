@@ -142,3 +142,11 @@ def test_app_refuses_default_secret_in_secure_mode(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(get_settings(), "cookie_secure", True)
     with pytest.raises(RuntimeError):
         create_app()
+
+
+def test_demo_mode_is_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Публичный список пользователей и вход без пароля включаются только явно
+    from app.core.config import Settings
+
+    monkeypatch.delenv("APP_DEMO_MODE", raising=False)
+    assert Settings(_env_file=None).demo_mode is False

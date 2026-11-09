@@ -10,7 +10,7 @@ test('полный цикл задачи от ТЗ до аналитики', asy
   const offer = `E2E оффер ${Date.now()}`;
 
   // 1. Байер создаёт ТЗ с дедлайном и референсом
-  const buyer = await loginAs(browser, 'Анна Козлова');
+  const buyer = await loginAs(browser, 'anna');
   await buyer.getByRole('button', { name: 'Новое ТЗ' }).click();
   const form = buyer.getByRole('dialog', { name: 'Новое ТЗ' });
   await form.getByLabel('Оффер').fill(offer);
@@ -31,7 +31,7 @@ test('полный цикл задачи от ТЗ до аналитики', asy
   await expect(buyerDialog.getByRole('link', { name: 'https://www.tiktok.com/@ref/video/1' })).toBeVisible();
 
   // 2. Креативщик видит задачу на доске, берёт в работу, вносит AI-расход и сдаёт
-  const creative = await loginAs(browser, 'Иван Петров');
+  const creative = await loginAs(browser, 'ivan');
   await expect(creative.getByLabel(`Задача ${taskId}: ${offer}`)).toBeVisible();
   await openTask(creative, taskId);
   await clickAction(creative, 'Взять в работу', 'Задача взята в работу');
@@ -86,7 +86,7 @@ test('полный цикл задачи от ТЗ до аналитики', asy
   }
 
   // 6. Руководитель видит задачу и расход в аналитике (фильтр по офферу)
-  const head = await loginAs(browser, 'Олег Смирнов');
+  const head = await loginAs(browser, 'head');
   await head.getByRole('link', { name: 'Аналитика' }).click();
   await head.getByLabel('Оффер').fill(offer);
   await expect(head.getByRole('group', { name: 'Создано' })).toContainText(/^Создано1/);
@@ -101,7 +101,7 @@ test('байер-креативщик не может взять собстве�
   const offer = `E2E своя задача ${Date.now()}`;
 
   // Екатерина — байер и креативщик одновременно: создаёт задачу без дедлайна
-  const kate = await loginAs(browser, 'Екатерина Лебедева');
+  const kate = await loginAs(browser, 'kate');
   await kate.getByRole('button', { name: 'Новое ТЗ' }).click();
   const form = kate.getByRole('dialog', { name: 'Новое ТЗ' });
   await form.getByLabel('Оффер').fill(offer);
@@ -119,7 +119,7 @@ test('байер-креативщик не может взять собстве�
   await expect(own.getByRole('button', { name: 'Взять в работу' })).toHaveCount(0);
 
   // Другой креативщик видит кнопку и берёт задачу
-  const ivan = await loginAs(browser, 'Иван Петров');
+  const ivan = await loginAs(browser, 'ivan');
   await openTask(ivan, taskId);
   await clickAction(ivan, 'Взять в работу', 'Задача взята в работу');
 });
