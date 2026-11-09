@@ -1,36 +1,21 @@
-import {
-  DndContext,
-  DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core';
+import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { Alert, Box, Button, Center, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 
 import { useMe } from '../api/auth';
-import {
-  useTasks,
-  type Task,
-  type TaskDetail,
-  type TaskFilters,
-  type TaskStatus,
-} from '../api/tasks';
+import { useTasks, type TaskDetail, type TaskFilters } from '../api/tasks';
 import { BoardColumn } from '../components/tasks/BoardColumn';
 import { BoardFilters } from '../components/tasks/BoardFilters';
 import { TaskCard } from '../components/tasks/TaskCard';
-import { TextPromptModal } from '../components/tasks/TaskActions';
+import { TextPromptModal } from '../components/common/TextPromptModal';
 import { TaskDrawer } from '../components/tasks/TaskDrawer';
 import { TaskFormModal } from '../components/tasks/TaskFormModal';
-import { useRunTransition } from '../hooks/useRunTransition';
+import { useBoardDnd } from '../hooks/useBoardDnd';
 import { useTaskDrawer } from '../hooks/useTaskDrawer';
 import { errorMessage } from '../lib/notify';
 import { hasRole } from '../lib/roles';
-import { allowedTargets, dropAction, groupByStatus } from '../lib/taskFlow';
+import { groupByStatus } from '../lib/taskFlow';
 import { BOARD_COLUMNS } from '../lib/tasks';
 
 export function BoardPage() {
@@ -40,37 +25,13 @@ export function BoardPage() {
   const drawer = useTaskDrawer();
   // undefined — форма закрыта, null — новая задача, TaskDetail — редактирование
   const [form, setForm] = useState<TaskDetail | null | undefined>(undefined);
-  const [dragged, setDragged] = useState<Task | null>(null);
-  const [revisionFor, setRevisionFor] = useState<Task | null>(null);
   // Сдать не дали без результата — открываем файлы именно этой задачи
-  const { run, isPending } = useRunTransition((taskId) => drawer.open(taskId, 'files'));
-
-  const sensors = useSensors(
-    // Небольшой порог: простой клик открывает карточку, а не начинает перетаскивание
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor),
+  const { dragged, targets, dndProps, revision } = useBoardDnd((taskId) =>
+    drawer.open(taskId, 'files'),
   );
 
   const groups = useMemo(() => groupByStatus(tasks.data ?? []), [tasks.data]);
-  const targets = dragged ? allowedTargets(dragged) : [];
   const canCreate = hasRole(me.data, 'buyer', 'head');
-
-  const onDragStart = (e: DragStartEvent) =>
-    setDragged((e.active.data.current as { task: Task }).task);
-
-  const onDragEnd = (e: DragEndEvent) => {
-    const task = dragged;
-    setDragged(null);
-    if (!task || !e.over) return;
-    const action = dropAction(task, e.over.id as TaskStatus);
-    if (!action) return;
-    // Правкам нужен комментарий — спрашиваем
-    if (action === 'request_revision') {
-      setRevisionFor(task);
-      return;
-    }
-    run({ id: task.id, action });
-  };
 
   return (
     <Stack gap="md">
@@ -102,12 +63,7 @@ export function BoardPage() {
         </Center>
       )}
 
-      <DndContext
-        sensors={sensors}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        onDragCancel={() => setDragged(null)}
-      >
+      <DndContext {...dndProps}>
         <Box style={{ overflowX: 'auto' }} pb="xs">
           <Group align="flex-start" wrap="nowrap" gap="sm" miw={5 * 222}>
             {BOARD_COLUMNS.map((status) => (
@@ -148,21 +104,16 @@ export function BoardPage() {
       )}
 
       <TextPromptModal
-        key={`board-revision-${revisionFor?.id ?? 0}`}
-        opened={revisionFor !== null}
-        title={`Отправить на правки: ${revisionFor?.offer ?? ''}`}
+        key={`board-revision-${revision.task?.id ?? 0}`}
+        opened={revision.task !== null}
+        title={`Отправить на правки: ${revision.task?.offer ?? ''}`}
         label="Что исправить"
         description="Комментарий увидит исполнитель; он же сохранится в истории задачи."
         confirm="Отправить на правки"
         color="orange"
-        loading={isPending}
-        onClose={() => setRevisionFor(null)}
-        onSubmit={(comment) =>
-          revisionFor &&
-          run({ id: revisionFor.id, action: 'request-revision', comment }, () =>
-            setRevisionFor(null),
-          )
-        }
+        loading={revision.isPending}
+        onClose={revision.cancel}
+        onSubmit={revision.submit}
       />
     </Stack>
   );

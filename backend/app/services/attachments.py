@@ -8,13 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
 from app.core.config import get_settings
-from app.core.errors import Conflict, NotFound
+from app.core.errors import AppError, Conflict, NotFound
 from app.models.attachment import AttachmentKind, TaskAttachment
-from app.models.task import EventType, Task
+from app.models.task import Action, EventType, Task
 from app.models.user import User
-from app.services import tasks as task_service
-from app.services.storage import FileStorage, safe_filename
-from app.services.task_permissions import Action, ensure_allowed
+from app.services import task_queries
+from app.services.storage import FileStorage, FileTooLarge, safe_filename
+from app.services.task_history import add_event
+from app.services.task_permissions import ensure_allowed
+from app.services.upload_policy import detect_content_type
 
 _KIND_ACTION = {
     AttachmentKind.REFERENCE: Action.ADD_REFERENCE,
@@ -28,7 +30,7 @@ def _current_round(task: Task, kind: AttachmentKind) -> int:
 
 
 async def list_attachments(session: AsyncSession, task_id: int) -> list[TaskAttachment]:
-    await task_service.get_task(session, task_id)
+    await task_queries.get_task(session, task_id)
     result = await session.scalars(
         select(TaskAttachment)
         .where(TaskAttachment.task_id == task_id, TaskAttachment.deleted_at.is_(None))
@@ -42,7 +44,7 @@ async def _add(
 ) -> TaskAttachment:
     session.add(attachment)
     await session.flush()
-    task_service.add_event(
+    add_event(
         session,
         task,
         user,
@@ -60,7 +62,7 @@ async def _add(
 async def add_link(
     session: AsyncSession, task_id: int, user: User, kind: AttachmentKind, url: str
 ) -> TaskAttachment:
-    task = await task_service.lock_task(session, task_id)
+    task = await task_queries.lock_task(session, task_id)
     ensure_allowed(_KIND_ACTION[kind], task, user)
     attachment = TaskAttachment(
         task_id=task.id,
@@ -83,14 +85,22 @@ async def add_file(
     filename: str | None,
 ) -> TaskAttachment:
     # Права проверяем до записи файла на диск
-    task = await task_service.get_task(session, task_id)
+    task = await task_queries.get_task(session, task_id)
     ensure_allowed(_KIND_ACTION[kind], task, user)
 
-    # Запись файла — блокирующий ввод-вывод, выносим из event loop
-    stored = await asyncio.to_thread(storage.save, stream, get_settings().max_upload_bytes)
+    # Политика: допустим ли тип (по содержимому); запись — блокирующий ввод-вывод, вне event loop
+    content_type = await asyncio.to_thread(detect_content_type, stream)
+    max_bytes = get_settings().max_upload_bytes
+    try:
+        stored = await asyncio.to_thread(storage.save, stream, max_bytes)
+    except FileTooLarge as exc:
+        # Ошибка хранилища → ответ API
+        raise AppError(
+            "file_too_large", f"Файл больше {max_bytes // (1024 * 1024)} МБ — приложите ссылку", 413
+        ) from exc
     try:
         # Повторная проверка под блокировкой: статус мог смениться, пока файл грузился
-        task = await task_service.lock_task(session, task_id)
+        task = await task_queries.lock_task(session, task_id)
         ensure_allowed(_KIND_ACTION[kind], task, user)
         attachment = TaskAttachment(
             task_id=task.id,
@@ -98,7 +108,7 @@ async def add_file(
             round=_current_round(task, kind),
             storage_key=stored.key,
             filename=safe_filename(filename),
-            content_type=stored.content_type,
+            content_type=content_type,
             size=stored.size,
             created_by_id=user.id,
             created_at=clock.now(),
@@ -119,7 +129,7 @@ async def get_attachment(session: AsyncSession, attachment_id: int) -> TaskAttac
 
 async def remove(session: AsyncSession, attachment_id: int, user: User) -> None:
     attachment = await get_attachment(session, attachment_id)
-    task = await task_service.lock_task(session, attachment.task_id)
+    task = await task_queries.lock_task(session, attachment.task_id)
     kind = AttachmentKind(attachment.kind)
     ensure_allowed(_KIND_ACTION[kind], task, user)
 
@@ -132,7 +142,7 @@ async def remove(session: AsyncSession, attachment_id: int, user: User) -> None:
     # Мягкое удаление: файл остаётся на диске, запись — в истории
     attachment.deleted_at = clock.now()
     attachment.deleted_by_id = user.id
-    task_service.add_event(
+    add_event(
         session,
         task,
         user,

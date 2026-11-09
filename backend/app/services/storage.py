@@ -1,7 +1,7 @@
-"""Хранилище загруженных файлов.
+"""Хранилище загруженных файлов — только запись и чтение байтов.
 
+Что допустимо загружать, решает upload_policy; как ответить клиенту при ошибке — сервис вложений.
 Интерфейс FileStorage позволяет заменить локальный диск на S3/MinIO, не трогая бизнес-логику.
-Тип файла определяется по содержимому (сигнатуре), а не по расширению или заголовку клиента.
 """
 
 import os
@@ -12,34 +12,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Protocol
 
-import filetype
-
 from app.core.config import get_settings
-from app.core.errors import AppError
-
-# Разрешённые типы: изображения, видео, PDF. SVG и HTML запрещены — в них можно спрятать скрипт
-ALLOWED_TYPES: frozenset[str] = frozenset(
-    {
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-        "video/mp4",
-        "video/webm",
-        "video/quicktime",
-        "application/pdf",
-    }
-)
 
 _CHUNK = 1024 * 1024
-_SNIFF_BYTES = 8192
+_KEY_PATTERN = re.compile(r"[a-f0-9]{32}")
+
+
+class StorageError(Exception):
+    """Ошибка хранилища — не знает про HTTP; переводится в ответ API уровнем выше."""
+
+
+class FileTooLarge(StorageError):
+    def __init__(self, max_bytes: int) -> None:
+        super().__init__(f"Файл больше {max_bytes} байт")
+        self.max_bytes = max_bytes
 
 
 @dataclass(frozen=True)
 class StoredFile:
     key: str
     size: int
-    content_type: str
 
 
 class FileStorage(Protocol):
@@ -58,25 +50,11 @@ class LocalFileStorage:
 
     def _target(self, key: str) -> Path:
         # Ключ генерируем сами, но всё равно не выпускаем путь за пределы каталога
-        if not re.fullmatch(r"[a-f0-9]{32}", key):
-            raise AppError("invalid_storage_key", "Некорректный ключ файла", 400)
+        if not _KEY_PATTERN.fullmatch(key):
+            raise StorageError("Некорректный ключ файла")
         return self.base / key[:2] / key
 
     def save(self, stream: BinaryIO, max_bytes: int) -> StoredFile:
-        head = stream.read(_SNIFF_BYTES)
-        if not head:
-            raise AppError("empty_file", "Файл пустой")
-
-        # Тип — по сигнатуре содержимого
-        kind = filetype.guess(head)
-        content_type = kind.mime if kind else None
-        if content_type not in ALLOWED_TYPES:
-            raise AppError(
-                "file_type_not_allowed",
-                "Допустимы только изображения (JPG, PNG, GIF, WebP), видео (MP4, WebM, MOV) и PDF",
-                415,
-            )
-
         key = secrets.token_hex(16)
         target = self._target(key)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -86,20 +64,15 @@ class LocalFileStorage:
         size = 0
         try:
             with tmp.open("wb") as out:
-                chunk = head
-                while chunk:
+                while chunk := stream.read(_CHUNK):
                     size += len(chunk)
                     if size > max_bytes:
-                        limit_mb = max_bytes // (1024 * 1024)
-                        raise AppError(
-                            "file_too_large", f"Файл больше {limit_mb} МБ — приложите ссылку", 413
-                        )
+                        raise FileTooLarge(max_bytes)
                     out.write(chunk)
-                    chunk = stream.read(_CHUNK)
             os.replace(tmp, target)
         finally:
             tmp.unlink(missing_ok=True)
-        return StoredFile(key=key, size=size, content_type=content_type)
+        return StoredFile(key=key, size=size)
 
     def path(self, key: str) -> Path:
         return self._target(key)

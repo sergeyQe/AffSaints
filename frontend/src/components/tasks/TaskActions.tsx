@@ -1,4 +1,4 @@
-import { Button, Group, Modal, Select, Stack, Text, Textarea } from '@mantine/core';
+import { Button, Group } from '@mantine/core';
 import {
   IconArrowBackUp,
   IconCheck,
@@ -12,123 +12,12 @@ import {
 import { useState } from 'react';
 
 import type { TaskDetail } from '../../api/tasks';
-import { useUsers } from '../../api/users';
 import { useRunTransition } from '../../hooks/useRunTransition';
+import { TextPromptModal } from '../common/TextPromptModal';
+import { ReassignModal } from './ReassignModal';
 
 /** Какое окно ввода открыто: комментарий правок, причина отмены, выбор исполнителя. */
 export type PromptKind = 'revision' | 'cancel' | 'reassign' | null;
-
-export function TextPromptModal({
-  title,
-  label,
-  description,
-  confirm,
-  color,
-  opened,
-  loading,
-  onClose,
-  onSubmit,
-}: {
-  title: string;
-  label: string;
-  description?: string;
-  confirm: string;
-  color: string;
-  opened: boolean;
-  loading: boolean;
-  onClose: () => void;
-  onSubmit: (text: string) => void;
-}) {
-  const [text, setText] = useState('');
-  const [touched, setTouched] = useState(false);
-  const error = touched && !text.trim() ? 'Обязательное поле' : null;
-  return (
-    <Modal opened={opened} onClose={onClose} title={title} zIndex={400}>
-      <Stack>
-        {description && (
-          <Text size="sm" c="dimmed">
-            {description}
-          </Text>
-        )}
-        <Textarea
-          label={label}
-          autosize
-          minRows={3}
-          value={text}
-          error={error}
-          onChange={(e) => setText(e.currentTarget.value)}
-          data-autofocus
-        />
-        <Group justify="flex-end">
-          <Button variant="default" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button
-            color={color}
-            loading={loading}
-            onClick={() => {
-              setTouched(true);
-              if (text.trim()) onSubmit(text.trim());
-            }}
-          >
-            {confirm}
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
-  );
-}
-
-function ReassignModal({
-  task,
-  opened,
-  loading,
-  onClose,
-  onSubmit,
-}: {
-  task: TaskDetail;
-  opened: boolean;
-  loading: boolean;
-  onClose: () => void;
-  onSubmit: (assigneeId: number) => void;
-}) {
-  const creatives = useUsers({ role: 'creative' });
-  const [value, setValue] = useState<string | null>(null);
-  // Автор и текущий исполнитель исключаются — backend их всё равно не примет
-  const options = (creatives.data ?? [])
-    .filter((u) => u.id !== task.author.id && u.id !== task.assignee?.id)
-    .map((u) => ({ value: String(u.id), label: u.full_name }));
-  return (
-    <Modal opened={opened} onClose={onClose} title="Сменить исполнителя" zIndex={400}>
-      <Stack>
-        <Text size="sm" c="dimmed">
-          Сейчас: {task.assignee?.full_name ?? '—'}. Время работы прежнего исполнителя сохранится за
-          ним.
-        </Text>
-        <Select
-          label="Новый исполнитель"
-          data={options}
-          value={value}
-          onChange={setValue}
-          searchable
-          nothingFoundMessage="Нет подходящих креативщиков"
-        />
-        <Group justify="flex-end">
-          <Button variant="default" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button
-            disabled={!value}
-            loading={loading}
-            onClick={() => value && onSubmit(Number(value))}
-          >
-            Назначить
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
-  );
-}
 
 interface Props {
   task: TaskDetail;

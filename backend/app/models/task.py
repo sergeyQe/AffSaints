@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import (
     CheckConstraint,
@@ -33,6 +33,26 @@ class TaskStatus(StrEnum):
 CLOSED_STATUSES = frozenset({TaskStatus.DONE, TaskStatus.CANCELLED})
 # Статусы, в которых креативщик занят задачей (для загрузки)
 ACTIVE_STATUSES = frozenset({TaskStatus.IN_PROGRESS, TaskStatus.REVIEW, TaskStatus.REVISION})
+
+
+class Action(StrEnum):
+    """Действия над задачей. Доменное понятие: им пользуются правила доступа, API и схемы."""
+
+    EDIT = "edit"
+    CANCEL = "cancel"
+    TAKE = "take"
+    SUBMIT = "submit"
+    ACCEPT = "accept"
+    REQUEST_REVISION = "request_revision"
+    REASSIGN = "reassign"
+    UNASSIGN = "unassign"
+    ADD_REFERENCE = "add_reference"
+    ADD_RESULT = "add_result"
+    MANAGE_AI_USAGE = "manage_ai_usage"
+
+
+# Состояние просрочки: нет / просрочена сейчас / сдана с опозданием
+OverdueState = Literal["none", "current", "late"]
 
 
 class Priority(StrEnum):
@@ -189,8 +209,10 @@ __all__ = [
     "ACTIVE_STATUSES",
     "BOARD_ORDER",
     "CLOSED_STATUSES",
+    "Action",
     "CreativeType",
     "EventType",
+    "OverdueState",
     "Priority",
     "Task",
     "TaskEvent",

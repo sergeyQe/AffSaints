@@ -47,70 +47,48 @@ export interface EventText {
   color: string;
 }
 
+type Payload = TaskEvent['payload'];
+type Formatter = (p: Payload) => EventText;
+
+const kindName = (p: Payload) => (p.kind === 'result' ? 'результат' : 'референс');
+const changes = (p: Payload) => describeChanges((p.changes as Change[]) ?? []);
+const text = (title: string, color: string, details: string[] = []): EventText => ({
+  title,
+  details,
+  color,
+});
+
+/**
+ * Реестр «тип события → как его показать». Новый тип события — новая строка здесь,
+ * общая функция describeEvent не меняется.
+ */
+const FORMATTERS: Record<string, Formatter> = {
+  created: () => text('Задача создана', 'gray'),
+  updated: (p) => text('ТЗ изменено', 'violet', changes(p)),
+  taken: () => text('Взята в работу', 'blue'),
+  submitted: () => text('Сдана на проверку', 'yellow'),
+  resubmitted: () => text('Исправления сданы на проверку', 'yellow'),
+  accepted: () => text('Работа принята', 'teal'),
+  revision_requested: (p) =>
+    text(`Отправлена на правки (круг ${String(p.round ?? '')})`, 'orange', [`«${str(p.comment)}»`]),
+  cancelled: (p) => text('Задача отменена', 'red', [`Причина: «${str(p.reason)}»`]),
+  reassigned: (p) => text('Исполнитель заменён', 'grape', [`${person(p.from)} → ${person(p.to)}`]),
+  unassigned: (p) =>
+    text('Исполнитель снят, задача вернулась в пул', 'grape', [`Был: ${person(p.from)}`]),
+  attachment_added: (p) => text(`Добавлен ${kindName(p)}`, 'cyan', [str(p.name)]),
+  attachment_removed: (p) => text(`Удалён ${kindName(p)}`, 'gray', [str(p.name)]),
+  ai_usage_added: (p) =>
+    text('Указан расход AI', 'indigo', [
+      `${str(p.service)}: ${str(p.credits)} кр. (${str(p.user)})`,
+    ]),
+  ai_usage_updated: (p) => text('Изменён расход AI', 'indigo', changes(p)),
+  ai_usage_removed: (p) =>
+    text('Удалён расход AI', 'gray', [`${str(p.service)}: ${str(p.credits)} кр.`]),
+};
+
 /** Текст события истории — нейтральный по форме (без «создал/создала»). */
 export function describeEvent(event: TaskEvent): EventText {
-  const p = event.payload;
-  const kindName = p.kind === 'result' ? 'результат' : 'референс';
-  switch (event.type) {
-    case 'created':
-      return { title: 'Задача создана', details: [], color: 'gray' };
-    case 'updated':
-      return {
-        title: 'ТЗ изменено',
-        details: describeChanges((p.changes as Change[]) ?? []),
-        color: 'violet',
-      };
-    case 'taken':
-      return { title: 'Взята в работу', details: [], color: 'blue' };
-    case 'submitted':
-      return { title: 'Сдана на проверку', details: [], color: 'yellow' };
-    case 'resubmitted':
-      return { title: 'Исправления сданы на проверку', details: [], color: 'yellow' };
-    case 'accepted':
-      return { title: 'Работа принята', details: [], color: 'teal' };
-    case 'revision_requested':
-      return {
-        title: `Отправлена на правки (круг ${String(p.round ?? '')})`,
-        details: [`«${str(p.comment)}»`],
-        color: 'orange',
-      };
-    case 'cancelled':
-      return { title: 'Задача отменена', details: [`Причина: «${str(p.reason)}»`], color: 'red' };
-    case 'reassigned':
-      return {
-        title: 'Исполнитель заменён',
-        details: [`${person(p.from)} → ${person(p.to)}`],
-        color: 'grape',
-      };
-    case 'unassigned':
-      return {
-        title: 'Исполнитель снят, задача вернулась в пул',
-        details: [`Был: ${person(p.from)}`],
-        color: 'grape',
-      };
-    case 'attachment_added':
-      return { title: `Добавлен ${kindName}`, details: [str(p.name)], color: 'cyan' };
-    case 'attachment_removed':
-      return { title: `Удалён ${kindName}`, details: [str(p.name)], color: 'gray' };
-    case 'ai_usage_added':
-      return {
-        title: 'Указан расход AI',
-        details: [`${str(p.service)}: ${str(p.credits)} кр. (${str(p.user)})`],
-        color: 'indigo',
-      };
-    case 'ai_usage_updated':
-      return {
-        title: 'Изменён расход AI',
-        details: describeChanges((p.changes as Change[]) ?? []),
-        color: 'indigo',
-      };
-    case 'ai_usage_removed':
-      return {
-        title: 'Удалён расход AI',
-        details: [`${str(p.service)}: ${str(p.credits)} кр.`],
-        color: 'gray',
-      };
-    default:
-      return { title: event.type, details: [], color: 'gray' };
-  }
+  const format = FORMATTERS[event.type];
+  // Неизвестный тип (например, добавили на backend раньше фронта) не ломает историю
+  return format ? format(event.payload) : text(event.type, 'gray');
 }

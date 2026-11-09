@@ -1,13 +1,10 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
-from app.models.task import CreativeType, Priority, TaskStatus
+from app.models.task import Action, CreativeType, OverdueState, Priority, TaskStatus
 from app.schemas.user import UserBrief
-from app.services.task_permissions import Action
-
-OverdueState = Literal["none", "current", "late"]
 
 
 def _strip_required(v: str) -> str:

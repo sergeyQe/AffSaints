@@ -6,26 +6,10 @@ Backend проверяет каждое действие через ensure_allow
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import StrEnum
 
 from app.core.errors import Conflict, Forbidden
-from app.models.task import ACTIVE_STATUSES, CLOSED_STATUSES, Task, TaskStatus
+from app.models.task import ACTIVE_STATUSES, CLOSED_STATUSES, Action, Task, TaskStatus
 from app.models.user import Role, User
-
-
-class Action(StrEnum):
-    EDIT = "edit"
-    CANCEL = "cancel"
-    TAKE = "take"
-    SUBMIT = "submit"
-    ACCEPT = "accept"
-    REQUEST_REVISION = "request_revision"
-    REASSIGN = "reassign"
-    UNASSIGN = "unassign"
-    ADD_REFERENCE = "add_reference"
-    ADD_RESULT = "add_result"
-    MANAGE_AI_USAGE = "manage_ai_usage"
-
 
 STATUS_LABELS = {
     TaskStatus.NEW: "Новые",
@@ -81,12 +65,29 @@ def _head(_: Task, user: User) -> str | None:
 class Rule:
     statuses: frozenset[TaskStatus]
     who: WhoCheck
+    # Исключение: если вернул True — действие разрешено в любом статусе, без проверки «кто»
+    any_status_if: Callable[[Task, User], bool] | None = None
+    # Своя ошибка для неподходящего статуса (вместо общей «недоступно в статусе …»)
+    status_conflict: Callable[[TaskStatus], Conflict | None] | None = None
+
+
+def _head_on_assigned_task(task: Task, user: User) -> bool:
+    # Руководитель правит AI-расходы и в закрытых задачах (решение №15)
+    return user.has_role(Role.HEAD) and task.assignee_id is not None
+
+
+def _already_taken(status: TaskStatus) -> Conflict | None:
+    if status in ACTIVE_STATUSES:
+        return Conflict("task_already_taken", "Задачу уже взял в работу другой исполнитель")
+    return None
 
 
 RULES: dict[Action, Rule] = {
     Action.EDIT: Rule(OPEN_STATUSES, _author_or_head),
     Action.CANCEL: Rule(OPEN_STATUSES, _author_or_head),
-    Action.TAKE: Rule(frozenset({TaskStatus.NEW}), _creative_not_author),
+    Action.TAKE: Rule(
+        frozenset({TaskStatus.NEW}), _creative_not_author, status_conflict=_already_taken
+    ),
     Action.SUBMIT: Rule(frozenset({TaskStatus.IN_PROGRESS, TaskStatus.REVISION}), _assignee),
     Action.ACCEPT: Rule(frozenset({TaskStatus.REVIEW}), _reviewer),
     Action.REQUEST_REVISION: Rule(frozenset({TaskStatus.REVIEW}), _reviewer),
@@ -95,20 +96,23 @@ RULES: dict[Action, Rule] = {
     Action.ADD_REFERENCE: Rule(OPEN_STATUSES, _author_or_head),
     Action.ADD_RESULT: Rule(frozenset({TaskStatus.IN_PROGRESS, TaskStatus.REVISION}), _assignee),
     # Расходы: исполнитель до закрытия задачи; руководитель — всегда (решение №15)
-    Action.MANAGE_AI_USAGE: Rule(ACTIVE_STATUSES, _assignee_or_head),
+    Action.MANAGE_AI_USAGE: Rule(
+        ACTIVE_STATUSES, _assignee_or_head, any_status_if=_head_on_assigned_task
+    ),
 }
 
 
 def _denial(action: Action, task: Task, user: User) -> Conflict | Forbidden | None:
-    # Руководитель правит расходы и в закрытых задачах
-    if action is Action.MANAGE_AI_USAGE and user.has_role(Role.HEAD) and task.assignee_id:
+    # Ядро проверки общее для всех действий; исключения описаны данными в RULES
+    rule = RULES[action]
+    if rule.any_status_if is not None and rule.any_status_if(task, user):
         return None
 
-    rule = RULES[action]
     status = task.status_enum
     if status not in rule.statuses:
-        if action is Action.TAKE and status in ACTIVE_STATUSES:
-            return Conflict("task_already_taken", "Задачу уже взял в работу другой исполнитель")
+        special = rule.status_conflict(status) if rule.status_conflict else None
+        if special is not None:
+            return special
         return Conflict(
             "invalid_status", f"Действие недоступно в статусе «{STATUS_LABELS[status]}»"
         )

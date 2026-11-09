@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
+from app.core.sql import LIKE_ESCAPE, contains_pattern
 from app.models.ai import AiService, AiUsage
 from app.models.task import (
     ACTIVE_STATUSES,
@@ -44,17 +45,13 @@ from app.schemas.user import UserBrief
 _ACTIVE = [s.value for s in ACTIVE_STATUSES]
 
 
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
 def _task_filters(q: AnalyticsQuery, *, by_assignee: bool = True) -> list[ColumnElement[bool]]:
     """Фильтры по байеру, офферу и (опционально) исполнителю задачи."""
     conds: list[ColumnElement[bool]] = []
     if q.buyer_id is not None:
         conds.append(Task.author_id == q.buyer_id)
     if q.offer:
-        conds.append(Task.offer.ilike(f"%{_escape_like(q.offer)}%", escape="\\"))
+        conds.append(Task.offer.ilike(contains_pattern(q.offer), escape=LIKE_ESCAPE))
     if by_assignee and q.creative_id is not None:
         conds.append(Task.assignee_id == q.creative_id)
     return conds

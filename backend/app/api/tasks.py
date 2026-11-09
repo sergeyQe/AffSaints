@@ -20,8 +20,10 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.schemas.user import UserBrief
+from app.services import task_queries
 from app.services import tasks as service
 from app.services.task_permissions import allowed_actions
+from app.services.work_intervals import work_seconds
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -59,14 +61,14 @@ def to_out(task: Task, user: User) -> TaskOut:
         revision_count=task.revision_count,
         revision_comment=task.revision_comment,
         brief_updated_at=task.brief_updated_at,
-        overdue=service.overdue_state(task, clock.now()),
+        overdue=task_queries.overdue_state(task, clock.now()),
         actions=allowed_actions(task, user),
     )
 
 
 async def to_detail(session: AsyncSession, task: Task, user: User) -> TaskDetail:
     base = to_out(task, user)
-    seconds = await service.work_seconds(session, task.id, clock.now())
+    seconds = await work_seconds(session, task.id, clock.now())
     return TaskDetail(**base.model_dump(), work_seconds=seconds)
 
 
@@ -76,7 +78,7 @@ async def list_tasks(
     user: CurrentUser,
     filters: Annotated[TaskFilters, Query()],
 ) -> list[TaskOut]:
-    return [to_out(t, user) for t in await service.list_tasks(session, filters)]
+    return [to_out(t, user) for t in await task_queries.list_tasks(session, filters)]
 
 
 @router.post("", status_code=201)
@@ -92,7 +94,7 @@ async def create_task(
 
 @router.get("/{task_id}")
 async def get_task(task_id: int, session: Session, user: CurrentUser) -> TaskDetail:
-    return await to_detail(session, await service.get_task(session, task_id), user)
+    return await to_detail(session, await task_queries.get_task(session, task_id), user)
 
 
 @router.patch("/{task_id}")
@@ -105,7 +107,7 @@ async def update_task(
 
 @router.get("/{task_id}/events")
 async def task_events(task_id: int, session: Session, _: CurrentUser) -> list[EventOut]:
-    events = await service.list_events(session, task_id)
+    events = await task_queries.list_events(session, task_id)
     return [
         EventOut(
             id=e.id,

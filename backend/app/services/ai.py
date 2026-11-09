@@ -10,11 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import clock
 from app.core.errors import AppError, Conflict, Forbidden, NotFound
 from app.models.ai import AiService, AiUsage
-from app.models.task import EventType, Task
+from app.models.task import Action, EventType, Task
 from app.models.user import Role, User
 from app.schemas.ai import AiServiceCreate, AiServiceUpdate, AiUsageCreate, AiUsageUpdate
-from app.services import tasks as task_service
-from app.services.task_permissions import Action, ensure_allowed
+from app.services import task_queries
+from app.services.task_history import add_event
+from app.services.task_permissions import ensure_allowed
 
 # ---------- справочник ----------
 
@@ -72,7 +73,7 @@ async def _active_service(session: AsyncSession, service_id: int) -> AiService:
 
 
 async def list_usage(session: AsyncSession, task_id: int) -> list[AiUsage]:
-    await task_service.get_task(session, task_id)
+    await task_queries.get_task(session, task_id)
     result = await session.scalars(
         select(AiUsage).where(AiUsage.task_id == task_id).order_by(AiUsage.created_at, AiUsage.id)
     )
@@ -103,7 +104,7 @@ def _usage_payload(usage: AiUsage) -> dict[str, Any]:
 async def add_usage(
     session: AsyncSession, task_id: int, actor: User, data: AiUsageCreate
 ) -> AiUsage:
-    task = await task_service.lock_task(session, task_id)
+    task = await task_queries.lock_task(session, task_id)
     ensure_allowed(Action.MANAGE_AI_USAGE, task, actor)
     service = await _active_service(session, data.service_id)
     assert task.assignee is not None  # гарантирует правило MANAGE_AI_USAGE
@@ -123,7 +124,7 @@ async def add_usage(
     await session.flush()
     usage.service = service
     usage.user = task.assignee
-    task_service.add_event(session, task, actor, EventType.AI_USAGE_ADDED, **_usage_payload(usage))
+    add_event(session, task, actor, EventType.AI_USAGE_ADDED, **_usage_payload(usage))
     await session.commit()
     return usage
 
@@ -132,7 +133,7 @@ async def _lock_usage(session: AsyncSession, usage_id: int, actor: User) -> tupl
     usage = await session.get(AiUsage, usage_id)
     if usage is None:
         raise NotFound("ai_usage_not_found", "Запись о расходе не найдена")
-    task = await task_service.lock_task(session, usage.task_id)
+    task = await task_queries.lock_task(session, usage.task_id)
     # Пока ждали блокировку, запись могли удалить или изменить — перечитываем
     refreshed = await session.get(AiUsage, usage_id, populate_existing=True)
     if refreshed is None:
@@ -163,7 +164,7 @@ async def update_usage(
 
     if changes:
         usage.updated_at = clock.now()
-        task_service.add_event(
+        add_event(
             session,
             task,
             actor,
@@ -177,8 +178,6 @@ async def update_usage(
 
 async def remove_usage(session: AsyncSession, usage_id: int, actor: User) -> None:
     usage, task = await _lock_usage(session, usage_id, actor)
-    task_service.add_event(
-        session, task, actor, EventType.AI_USAGE_REMOVED, **_usage_payload(usage)
-    )
+    add_event(session, task, actor, EventType.AI_USAGE_REMOVED, **_usage_payload(usage))
     await session.delete(usage)
     await session.commit()

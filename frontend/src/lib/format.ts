@@ -1,3 +1,5 @@
+import { formatDuration } from './tasks';
+
 /** Кредиты: «1 234,5». */
 export const formatCredits = (n: number) =>
   n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -21,3 +23,9 @@ export function initials(name: string): string {
 
 /** Ссылка безопасна для href: только http(s) и не пустая после схемы. */
 export const isHttpUrl = (url: string) => /^https?:\/\/\S{3,}$/i.test(url.trim());
+
+/** Доля → «33%»; нет данных → «—». */
+export const formatPercent = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`);
+
+/** Длительность в секундах или «—», если данных нет. */
+export const formatDurationOrDash = (s: number | null) => (s === null ? '—' : formatDuration(s));

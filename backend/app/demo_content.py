@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, ClassVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -232,6 +232,83 @@ async def _create_services(session: AsyncSession, now: datetime) -> dict[str, Ai
     return services
 
 
+@dataclass
+class _Player:
+    """Проигрывает шаги сценария одной задачи. Новый тип шага — новый метод и имя в STEP_TYPES."""
+
+    session: AsyncSession
+    task_id: int
+    users: dict[str, User]
+    services: dict[str, AiService]
+    image_counter: int
+    # Номер версии результата = номер сдачи (первая сдача — v1, после правок — v2…)
+    version: int = 0
+
+    async def take(self, actor: User, _: Any) -> None:
+        await task_service.take(self.session, self.task_id, actor)
+
+    async def submit(self, actor: User, _: Any) -> None:
+        # Перед сдачей — результат: каждый второй круг файлом-картинкой, иначе ссылкой
+        self.image_counter += 1
+        self.version += 1
+        if self.image_counter % 2:
+            await attachment_service.add_file(
+                self.session,
+                get_storage(),
+                self.task_id,
+                actor,
+                AttachmentKind.RESULT,
+                io.BytesIO(demo_image(self.image_counter)),
+                f"креатив_v{self.version}.png",
+            )
+        else:
+            await attachment_service.add_link(
+                self.session,
+                self.task_id,
+                actor,
+                AttachmentKind.RESULT,
+                f"https://drive.google.com/drive/folders/demo-{self.task_id}-v{self.version}",
+            )
+        await task_service.submit(self.session, self.task_id, actor)
+
+    async def accept(self, actor: User, _: Any) -> None:
+        await task_service.accept(self.session, self.task_id, actor)
+
+    async def revision(self, actor: User, comment: str) -> None:
+        await task_service.request_revision(self.session, self.task_id, actor, comment)
+
+    async def cancel(self, actor: User, reason: str) -> None:
+        await task_service.cancel(self.session, self.task_id, actor, reason)
+
+    async def reassign(self, actor: User, login: str) -> None:
+        await task_service.reassign(self.session, self.task_id, actor, self.users[login].id)
+
+    async def unassign(self, actor: User, _: Any) -> None:
+        await task_service.unassign(self.session, self.task_id, actor)
+
+    async def edit(self, actor: User, changes: dict[str, Any]) -> None:
+        await task_service.update_task(self.session, self.task_id, TaskUpdate(**changes), actor)
+
+    async def ai(self, actor: User, usage: tuple[str, str]) -> None:
+        name, credits = usage
+        await ai_service.add_usage(
+            self.session,
+            self.task_id,
+            actor,
+            AiUsageCreate(service_id=self.services[name].id, credits=Decimal(credits)),
+        )
+
+    # Допустимые типы шагов — каждому соответствует одноимённый метод
+    STEP_TYPES: ClassVar[frozenset[str]] = frozenset(
+        {"take", "submit", "accept", "revision", "cancel", "reassign", "unassign", "edit", "ai"}
+    )
+
+    async def run(self, step: Step, actor: User) -> None:
+        if step.action not in self.STEP_TYPES:
+            raise ValueError(f"Неизвестный шаг сценария: {step.action}")
+        await getattr(self, step.action)(actor, step.arg)
+
+
 async def _play(
     session: AsyncSession,
     story: Story,
@@ -241,9 +318,6 @@ async def _play(
     real_now: datetime,
 ) -> None:
     current = real_now - timedelta(days=story.days_ago)
-    image_counter = index * 3
-    # Номер версии результата = номер сдачи (первая сдача — v1, после правок — v2…)
-    version = 0
 
     def at() -> datetime:
         return current
@@ -268,6 +342,7 @@ async def _play(
             ),
             users[story.author],
         )
+        player = _Player(session, task.id, users, services, image_counter=index * 3)
         if story.reference_link:
             await attachment_service.add_link(
                 session,
@@ -283,64 +358,18 @@ async def _play(
                 task.id,
                 users[story.author],
                 AttachmentKind.REFERENCE,
-                io.BytesIO(demo_image(image_counter)),
+                io.BytesIO(demo_image(player.image_counter)),
                 "референс.png",
             )
 
-        # Шаги сценария
+        # Шаги сценария — каждый со своим временем
         for step in story.steps:
             current += timedelta(hours=step.hours)
             if current > real_now:
                 raise RuntimeError(f"Сценарий «{story.offer}» уходит в будущее")
-            actor = users[step.actor] if step.actor else None
-            assert actor is not None
-            if step.action == "take":
-                await task_service.take(session, task.id, actor)
-            elif step.action == "submit":
-                # Перед сдачей — результат: каждый второй круг файлом-картинкой, иначе ссылкой
-                image_counter += 1
-                version += 1
-                if image_counter % 2:
-                    await attachment_service.add_file(
-                        session,
-                        get_storage(),
-                        task.id,
-                        actor,
-                        AttachmentKind.RESULT,
-                        io.BytesIO(demo_image(image_counter)),
-                        f"креатив_v{version}.png",
-                    )
-                else:
-                    await attachment_service.add_link(
-                        session,
-                        task.id,
-                        actor,
-                        AttachmentKind.RESULT,
-                        f"https://drive.google.com/drive/folders/demo-{task.id}-v{version}",
-                    )
-                await task_service.submit(session, task.id, actor)
-            elif step.action == "accept":
-                await task_service.accept(session, task.id, actor)
-            elif step.action == "revision":
-                await task_service.request_revision(session, task.id, actor, step.arg)
-            elif step.action == "cancel":
-                await task_service.cancel(session, task.id, actor, step.arg)
-            elif step.action == "reassign":
-                await task_service.reassign(session, task.id, actor, users[step.arg].id)
-            elif step.action == "unassign":
-                await task_service.unassign(session, task.id, actor)
-            elif step.action == "edit":
-                await task_service.update_task(session, task.id, TaskUpdate(**step.arg), actor)
-            elif step.action == "ai":
-                name, credits = step.arg
-                await ai_service.add_usage(
-                    session,
-                    task.id,
-                    actor,
-                    AiUsageCreate(service_id=services[name].id, credits=Decimal(credits)),
-                )
-            else:
-                raise ValueError(f"Неизвестный шаг сценария: {step.action}")
+            if step.actor is None:
+                raise ValueError(f"У шага «{step.action}» не указан исполнитель")
+            await player.run(step, users[step.actor])
 
 
 async def seed_content(session: AsyncSession, users: dict[str, User]) -> None:
