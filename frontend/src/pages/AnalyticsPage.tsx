@@ -38,7 +38,7 @@ const NOT_TAKEN = 'Не взята в работу';
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <Paper withBorder p="md" radius="md">
+    <Paper withBorder p="md" radius="md" component="section" aria-label={title}>
       <Stack gap="sm">
         <div>
           <Title order={5}>{title}</Title>
@@ -56,7 +56,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <Paper withBorder p="md" radius="md">
+    <Paper withBorder p="md" radius="md" role="group" aria-label={label}>
       <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
         {label}
       </Text>

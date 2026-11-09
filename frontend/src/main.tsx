@@ -17,6 +17,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ME_KEY } from './api/auth';
 import { ApiError } from './api/client';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { theme } from './theme';
 
 dayjs.locale('ru');
@@ -46,9 +47,11 @@ createRoot(document.getElementById('root')!).render(
       <MantineProvider theme={theme} defaultColorScheme="light">
         <ModalsProvider>
           <Notifications position="top-right" />
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <ErrorBoundary>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </ErrorBoundary>
         </ModalsProvider>
       </MantineProvider>
     </QueryClientProvider>

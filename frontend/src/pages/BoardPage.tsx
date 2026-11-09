@@ -8,7 +8,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { Alert, Box, Button, Group, Stack, Text, Title } from '@mantine/core';
+import { Alert, Box, Button, Center, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 
@@ -94,6 +94,12 @@ export function BoardPage() {
         <Alert color="red" variant="light">
           Не удалось загрузить задачи: {errorMessage(tasks.error)}
         </Alert>
+      )}
+
+      {tasks.isPending && (
+        <Center py="xl">
+          <Loader />
+        </Center>
       )}
 
       <DndContext
