@@ -37,5 +37,7 @@ export function groupByStatus(tasks: Task[]): Record<TaskStatus, Task[]> {
     Task[]
   >;
   for (const t of tasks) groups[t.status]?.push(t);
+  // В «Готово» важна свежесть, а не приоритет: последняя принятая работа — сверху
+  groups.done.sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''));
   return groups;
 }

@@ -18,14 +18,16 @@ test('полный цикл задачи от ТЗ до аналитики', asy
   await form.getByLabel('Количество').fill('3');
   await form.getByRole('button', { name: '+3 дня' }).click();
   await form.getByLabel('Описание').fill('Вертикаль 15 секунд, сквозной тест');
+  // Референс — прямо в форме ТЗ, как требует задание
+  await form.getByLabel('Ссылка на референс').fill('https://www.tiktok.com/@ref/video/1');
+  await form.getByRole('button', { name: 'Добавить ссылку' }).click();
   await form.getByRole('button', { name: 'Создать задачу' }).click();
 
   // После создания открывается карточка на вкладке «Файлы»
   await expect(buyer).toHaveURL(/task=\d+/);
   const taskId = Number(new URL(buyer.url()).searchParams.get('task'));
+  // Референс из формы уже приложен — карточка открылась на вкладке «Файлы»
   const buyerDialog = buyer.getByRole('dialog');
-  await buyerDialog.getByLabel('Ссылка на референс').fill('https://www.tiktok.com/@ref/video/1');
-  await buyerDialog.getByRole('button', { name: 'Добавить ссылку' }).click();
   await expect(buyerDialog.getByRole('link', { name: 'https://www.tiktok.com/@ref/video/1' })).toBeVisible();
 
   // 2. Креативщик видит задачу на доске, берёт в работу, вносит AI-расход и сдаёт

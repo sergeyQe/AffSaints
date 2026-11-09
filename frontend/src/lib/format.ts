@@ -18,3 +18,6 @@ export function initials(name: string): string {
     .map((p) => p[0]?.toUpperCase())
     .join('');
 }
+
+/** Ссылка безопасна для href: только http(s) и не пустая после схемы. */
+export const isHttpUrl = (url: string) => /^https?:\/\/\S{3,}$/i.test(url.trim());

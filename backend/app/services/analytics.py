@@ -140,10 +140,17 @@ async def _by_status(session: AsyncSession, q: AnalyticsQuery) -> list[StatusCou
 # ---------- загрузка ----------
 
 
-async def _creatives(session: AsyncSession, q: AnalyticsQuery) -> list[User]:
+async def _creatives(session: AsyncSession, q: AnalyticsQuery, with_work: set[int]) -> list[User]:
+    # Активные креативщики + все, у кого есть работа (даже если их отключили или сняли роль),
+    # иначе «зависшие» на таком исполнителе задачи пропали бы из загрузки
     query = (
         select(User)
-        .where(User.is_active, User.role_links.any(UserRole.role == Role.CREATIVE.value))
+        .where(
+            or_(
+                and_(User.is_active, User.role_links.any(UserRole.role == Role.CREATIVE.value)),
+                User.id.in_(with_work),
+            )
+        )
         .order_by(User.full_name)
     )
     if q.creative_id is not None:
@@ -198,7 +205,8 @@ async def _workload(session: AsyncSession, q: AnalyticsQuery) -> list[WorkloadRo
     )
 
     rows = []
-    for user in await _creatives(session, q):
+    with_work = {uid for uid in (*active, *completed, *avg_work) if uid is not None}
+    for user in await _creatives(session, q, with_work):
         stats = active.get(user.id, {})
         count = {s: stats.get(s, (0, 0))[0] for s in _ACTIVE}
         rows.append(

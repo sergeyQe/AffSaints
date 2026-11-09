@@ -110,6 +110,10 @@ function Details({ task }: { task: TaskDetail }) {
         <Field label="Создана">{formatDateTime(task.created_at)}</Field>
         <Field label="Взята в работу">{formatDateTime(task.taken_at)}</Field>
         <Field label="Первая сдача">{formatDateTime(task.first_submitted_at)}</Field>
+        {/* После правок — когда сдали исправленное */}
+        {task.last_submitted_at && task.last_submitted_at !== task.first_submitted_at && (
+          <Field label="Последняя сдача">{formatDateTime(task.last_submitted_at)}</Field>
+        )}
         <Field label="Завершена">{formatDateTime(task.completed_at)}</Field>
       </SimpleGrid>
 

@@ -186,6 +186,23 @@ async def test_period_excludes_other_months(scenario: dict[str, Any]) -> None:
     assert len(data["timeline"]) == 31
 
 
+async def test_workload_keeps_deactivated_creative_with_active_tasks(
+    as_user: AsUser, fake_clock: FakeClock
+) -> None:
+    head = as_user(await create_user(Role.HEAD))
+    buyer = as_user(await create_user(Role.BUYER))
+    gone = await create_user(Role.CREATIVE, full_name="Уволенный")
+    tid = (await create_task(buyer, quantity=4))["id"]
+    ok(await act(as_user(gone), tid, "take"))
+
+    # Креативщика отключили, задача осталась на нём
+    ok(await head.patch(f"/api/users/{gone.id}", json={"is_active": False}))
+
+    rows = {r["user"]["full_name"]: r for r in (await analytics(head))["workload"]}
+    assert rows["Уволенный"]["active_tasks"] == 1
+    assert rows["Уволенный"]["active_creatives"] == 4
+
+
 async def test_late_is_attributed_to_first_submitter(
     as_user: AsUser, fake_clock: FakeClock
 ) -> None:

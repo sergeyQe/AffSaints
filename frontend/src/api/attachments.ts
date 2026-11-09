@@ -37,6 +37,40 @@ const key = (taskId: number) => ['tasks', 'attachments', taskId] as const;
 
 export const fileUrl = (a: Pick<Attachment, 'id'>) => `/api/attachments/${a.id}/file`;
 
+/**
+ * Референсы из формы создания ТЗ: загружаются после создания задачи, каждый отдельно.
+ * Возвращает имена тех, что не удалось приложить, — остальные при этом сохраняются.
+ */
+export async function uploadReferences(
+  taskId: number,
+  links: string[],
+  files: File[],
+): Promise<{ name: string; error: unknown }[]> {
+  const jobs = [
+    ...links.map((url) => ({
+      name: url,
+      run: () =>
+        api(`/tasks/${taskId}/attachments/link`, {
+          method: 'POST',
+          body: { kind: 'reference', url },
+        }),
+    })),
+    ...files.map((file) => ({
+      name: file.name,
+      run: () => {
+        const form = new FormData();
+        form.append('kind', 'reference');
+        form.append('file', file);
+        return api(`/tasks/${taskId}/attachments/file`, { method: 'POST', body: form });
+      },
+    })),
+  ];
+  const results = await Promise.allSettled(jobs.map((j) => j.run()));
+  return results.flatMap((r, i) =>
+    r.status === 'rejected' ? [{ name: jobs[i]!.name, error: r.reason }] : [],
+  );
+}
+
 export function useAttachments(taskId: number) {
   return useQuery({
     queryKey: key(taskId),

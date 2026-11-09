@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TaskAction, TaskStatus } from '../api/tasks';
-import { allowedTargets, dropAction } from './taskFlow';
+import { makeTask } from '../test/fixtures';
+import { allowedTargets, dropAction, groupByStatus } from './taskFlow';
 
 const task = (status: TaskStatus, actions: TaskAction[]) => ({ status, actions });
 
@@ -34,6 +35,20 @@ describe('dropAction', () => {
 
   it('руководитель возвращает задачу в пул', () => {
     expect(dropAction(task('in_progress', ['unassign']), 'new')).toBe('unassign');
+  });
+});
+
+describe('groupByStatus', () => {
+  it('«Готово» — по дате завершения, новые сверху; остальные колонки — в порядке backend', () => {
+    const groups = groupByStatus([
+      makeTask({ id: 1, status: 'done', completed_at: '2026-11-01T10:00:00Z' }),
+      makeTask({ id: 2, status: 'new' }),
+      makeTask({ id: 3, status: 'done', completed_at: '2026-11-08T10:00:00Z' }),
+      makeTask({ id: 4, status: 'new' }),
+    ]);
+    expect(groups.done.map((t) => t.id)).toEqual([3, 1]);
+    expect(groups.new.map((t) => t.id)).toEqual([2, 4]);
+    expect(groups.cancelled).toBeUndefined();
   });
 });
 

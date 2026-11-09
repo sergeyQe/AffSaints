@@ -19,6 +19,7 @@ import { IconAlertTriangle } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 
+import { uploadReferences } from '../../api/attachments';
 import { useCreateTask, useUpdateTask, type TaskBrief, type TaskDetail } from '../../api/tasks';
 import { notifyError, notifySuccess } from '../../lib/notify';
 import {
@@ -30,6 +31,7 @@ import {
   type TaskFormValues,
 } from '../../lib/taskForm';
 import { CREATIVE_TYPE_LABELS, PRIORITY_LABELS, toOptions } from '../../lib/tasks';
+import { ReferencesInput, type ReferencesValue } from './ReferencesInput';
 
 const QUICK_DEADLINES = [
   { label: '+1 день', days: 1 },
@@ -49,6 +51,9 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
   const create = useCreateTask();
   const update = useUpdateTask();
   const [confirmNoDeadline, setConfirmNoDeadline] = useState<TaskBrief | null>(null);
+  // Референсы из формы создания — прикладываются сразу после создания задачи
+  const [references, setReferences] = useState<ReferencesValue>({ links: [], files: [] });
+  const [uploading, setUploading] = useState(false);
 
   const form = useForm<TaskFormValues>({
     initialValues: initialValues(task),
@@ -68,7 +73,12 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
     const onError = (e: unknown) => notifyError(e);
     if (isNew) {
       create.mutate(brief, {
-        onSuccess: (created) => {
+        onSuccess: async (created) => {
+          // Задача создана — прикладываем референсы; сбой одного не отменяет остальные
+          setUploading(true);
+          const failed = await uploadReferences(created.id, references.links, references.files);
+          setUploading(false);
+          failed.forEach((f) => notifyError(f.error, `Референс «${f.name}» не приложен`));
           notifySuccess('Задача создана');
           onClose();
           onCreated?.(created);
@@ -104,7 +114,7 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
     save(brief);
   };
 
-  const busy = create.isPending || update.isPending;
+  const busy = create.isPending || update.isPending || uploading;
 
   return (
     <>
@@ -188,11 +198,7 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
               placeholder="Формат, хронометраж, текст на креативе, подход…"
               {...form.getInputProps('description')}
             />
-            {isNew && (
-              <Text size="xs" c="dimmed">
-                Референсы (ссылки и файлы) добавляются в карточке задачи сразу после создания.
-              </Text>
-            )}
+            {isNew && <ReferencesInput value={references} onChange={setReferences} />}
 
             <Group justify="flex-end">
               <Button variant="default" onClick={onClose}>
