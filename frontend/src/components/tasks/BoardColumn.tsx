@@ -58,9 +58,10 @@ export function BoardColumn({ status, tasks, canDrop, isDragActive, onOpen }: Pr
       data-over={(isOver && canDrop) || undefined}
       aria-label={`Колонка ${STATUS_LABELS[status]}`}
     >
-      <Group justify="space-between" px="sm" pt="sm" pb={6}>
-        <Group gap={6}>
-          <Badge color={STATUS_COLORS[status]} variant="dot" size="lg" radius="sm">
+      {/* Шапка в одну строку: на планшете колонка узкая (210 px), счётчик не должен переноситься */}
+      <Group justify="space-between" px="sm" pt="sm" pb={6} wrap="nowrap" gap={4}>
+        <Group gap={6} wrap="nowrap">
+          <Badge color={STATUS_COLORS[status]} variant="dot" size="md" radius="sm">
             {STATUS_LABELS[status]}
           </Badge>
           <Text size="sm" c="dimmed" fw={500}>
@@ -69,7 +70,7 @@ export function BoardColumn({ status, tasks, canDrop, isDragActive, onOpen }: Pr
         </Group>
         {tasks.length > 0 && (
           <Tooltip label="Креативов в колонке">
-            <Text size="xs" c="dimmed">
+            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
               {creatives} шт.
             </Text>
           </Tooltip>
