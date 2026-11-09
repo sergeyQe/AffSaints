@@ -1,6 +1,6 @@
 from fastapi import APIRouter, FastAPI
 
-from app.api import ai, attachments, auth, health, tasks, users
+from app.api import ai, analytics, attachments, auth, health, tasks, users
 from app.core.config import DEFAULT_JWT_SECRET, get_settings
 from app.core.errors import register_error_handlers
 
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     api.include_router(tasks.router)
     api.include_router(attachments.router)
     api.include_router(ai.router)
+    api.include_router(analytics.router)
     app.include_router(api)
     return app
 
