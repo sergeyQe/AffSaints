@@ -4,6 +4,8 @@
 
 **Демо:** https://109-120-147-30.sslip.io:8443 — вход по логинам [тестовых пользователей](#тестовые-пользователи). Демо-данные пересоздаются каждую ночь.
 
+**Для проверки:** [руководство — логика работы, данные для входа и сценарий проверки по шагам](docs/review-guide.md).
+
 ![Доска задач](docs/screenshots/02-board.png)
 
 ## Что умеет
@@ -97,8 +99,8 @@ docs/      решения, журнал AI-инструментов, скрин�
 
 | Уровень | Инструмент | Тестов |
 |---|---|---|
-| Backend | pytest на настоящем PostgreSQL (схема — через миграции) | 165 |
-| Frontend | Vitest + Testing Library | 99 |
+| Backend | pytest на настоящем PostgreSQL (схема — через миграции) | 183 |
+| Frontend | Vitest + Testing Library | 126 |
 | Сквозные | Playwright | 2 сценария |
 
 Линтеры и типы: ruff + mypy (strict), ESLint + Prettier + TypeScript strict. Всё запускается в GitHub Actions на каждый push; e2e — на одноразовом стенде Docker Compose.
