@@ -10,6 +10,9 @@ import { PRIORITY_LABELS, toOptions } from '../../lib/tasks';
 interface Props {
   value: TaskFilters;
   onChange: (next: TaskFilters) => void;
+  /** «Доступные только мне» — фильтр на клиенте, «Сбросить» его не трогает. */
+  onlyMine?: boolean;
+  onOnlyMineChange?: (next: boolean) => void;
 }
 
 /** Текстовое поле с задержкой: не дёргаем backend на каждую букву. */
@@ -40,7 +43,7 @@ function DebouncedInput({
   );
 }
 
-export function BoardFilters({ value, onChange }: Props) {
+export function BoardFilters({ value, onChange, onlyMine, onOnlyMineChange }: Props) {
   const creatives = useUsers({ role: 'creative' });
   const buyers = useUsers({ role: 'buyer' });
   const set = (patch: Partial<TaskFilters>) => onChange({ ...value, ...patch });
@@ -99,6 +102,14 @@ export function BoardFilters({ value, onChange }: Props) {
         checked={!!value.overdue}
         onChange={(e) => set({ overdue: e.currentTarget.checked || undefined })}
       />
+      {onOnlyMineChange && (
+        <Switch
+          size="md"
+          label="Доступные только мне"
+          checked={!!onlyMine}
+          onChange={(e) => onOnlyMineChange(e.currentTarget.checked)}
+        />
+      )}
       {hasFilters && (
         <Button
           variant="subtle"

@@ -58,3 +58,14 @@ export function groupByStatus(tasks: Task[]): Record<TaskStatus, Task[]> {
   groups.done.sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''));
   return groups;
 }
+
+/**
+ * Задача «доступна мне»: я могу с ней что-то сделать (кнопки или перенос) или она моя —
+ * я автор или исполнитель (например, моя работа ждёт проверки и действий сейчас нет).
+ */
+export function isAvailableToMe(
+  task: Pick<Task, 'actions' | 'author' | 'assignee'>,
+  userId: number,
+): boolean {
+  return task.actions.length > 0 || task.author.id === userId || task.assignee?.id === userId;
+}

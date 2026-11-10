@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { TaskAction, TaskStatus } from '../api/tasks';
 import { makeTask } from '../test/fixtures';
-import { allowedTargets, dropAction, groupByStatus } from './taskFlow';
+import { allowedTargets, dropAction, groupByStatus, isAvailableToMe } from './taskFlow';
 
 const task = (status: TaskStatus, actions: TaskAction[]) => ({ status, actions });
 
@@ -100,5 +100,28 @@ describe('allowedTargets', () => {
 
   it('у закрытой задачи целей нет', () => {
     expect(allowedTargets(task('done', []))).toEqual([]);
+  });
+});
+
+describe('isAvailableToMe', () => {
+  const me = 5;
+  const other = { id: 9, full_name: 'Другой' };
+  const mine = { id: me, full_name: 'Я' };
+
+  it('доступна, если есть действие (взять из пула, перенести)', () => {
+    expect(isAvailableToMe(makeTask({ actions: ['take'], author: other }), me)).toBe(true);
+  });
+
+  it('своя задача без действий — тоже доступна (автор или исполнитель)', () => {
+    expect(isAvailableToMe(makeTask({ actions: [], author: mine }), me)).toBe(true);
+    expect(isAvailableToMe(makeTask({ actions: [], author: other, assignee: mine }), me)).toBe(
+      true,
+    );
+  });
+
+  it('чужая задача без действий скрывается', () => {
+    expect(isAvailableToMe(makeTask({ actions: [], author: other, assignee: other }), me)).toBe(
+      false,
+    );
   });
 });

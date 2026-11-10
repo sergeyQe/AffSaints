@@ -17,7 +17,7 @@ import { useBoardDnd } from '../hooks/useBoardDnd';
 import { useTaskDrawer } from '../hooks/useTaskDrawer';
 import { errorMessage } from '../lib/notify';
 import { hasRole } from '../lib/roles';
-import { groupByStatus } from '../lib/taskFlow';
+import { groupByStatus, isAvailableToMe } from '../lib/taskFlow';
 import { BOARD_COLUMNS } from '../lib/tasks';
 
 export function BoardPage() {
@@ -32,7 +32,15 @@ export function BoardPage() {
     drawer.open(taskId, 'files'),
   );
 
-  const groups = useMemo(() => groupByStatus(tasks.data ?? []), [tasks.data]);
+  // «Доступные только мне» — по умолчанию включено, фильтр на клиенте по actions от backend
+  const [onlyMine, setOnlyMine] = useState(true);
+  const groups = useMemo(() => {
+    const all = tasks.data ?? [];
+    const userId = me.data?.id;
+    const visible =
+      onlyMine && userId !== undefined ? all.filter((t) => isAvailableToMe(t, userId)) : all;
+    return groupByStatus(visible);
+  }, [tasks.data, onlyMine, me.data?.id]);
   const canCreate = hasRole(me.data, 'buyer', 'head');
 
   return (
@@ -52,7 +60,12 @@ export function BoardPage() {
         )}
       </Group>
 
-      <BoardFilters value={filters} onChange={setFilters} />
+      <BoardFilters
+        value={filters}
+        onChange={setFilters}
+        onlyMine={onlyMine}
+        onOnlyMineChange={setOnlyMine}
+      />
 
       {tasks.isError && (
         <Alert color="red" variant="light">
