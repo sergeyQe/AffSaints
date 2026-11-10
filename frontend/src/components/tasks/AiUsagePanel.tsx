@@ -155,8 +155,9 @@ export function AiUsagePanel({ task }: { task: TaskDetail }) {
                   </Table.Tr>
                 ) : (
                   <Table.Tr key={u.id}>
-                    <Table.Td>
-                      <Group gap={4}>
+                    {/* Без переноса: метка круга не обрезается, таблица и так прокручивается */}
+                    <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                      <Group gap={4} wrap="nowrap">
                         <Text size="sm">{u.service.name}</Text>
                         {!u.service.is_active && (
                           <Badge size="xs" color="gray">
@@ -171,6 +172,8 @@ export function AiUsagePanel({ task }: { task: TaskDetail }) {
                         color={u.round > 0 ? 'orange' : 'blue'}
                         tt="none"
                         mt={2}
+                        // Badge по умолчанию ужимается до ширины ячейки и режет текст многоточием
+                        styles={{ root: { maxWidth: 'none' }, label: { overflow: 'visible' } }}
                       >
                         {u.round > 0 ? `Правки №${u.round}` : 'Первая версия'}
                       </Badge>

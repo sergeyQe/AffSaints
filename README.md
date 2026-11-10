@@ -56,7 +56,11 @@ docker compose up --build
 | ![Вход](docs/screenshots/01-login.png) | ![Файлы и версии результата](docs/screenshots/03-task-files.png) |
 | ![История задачи](docs/screenshots/04-task-history.png) | ![AI-расходы](docs/screenshots/05-task-ai.png) |
 
-![Аналитика](docs/screenshots/06-analytics.png)
+Аналитика — три вкладки с общими фильтрами:
+
+| Пользователи и задачи | Учёт AI-расходов | Учёт времени |
+|---|---|---|
+| ![Аналитика: пользователи и задачи](docs/screenshots/06-analytics.png) | ![Аналитика: учёт AI-расходов](docs/screenshots/08-analytics-ai.png) | ![Аналитика: учёт времени](docs/screenshots/09-analytics-time.png) |
 
 <img src="docs/screenshots/07-mobile-board.png" alt="Доска на телефоне" width="260">
 

@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { BoardFilters } from './components/tasks/BoardFilters';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { UsersPage } from './pages/UsersPage';
 import { mockFetch, renderWithProviders } from './test/utils';
@@ -51,5 +52,30 @@ describe('мобильная версия', () => {
 
     expect(await screen.findByText('Редактирование')).toBeInTheDocument();
     expect(screen.getByLabelText('Имя')).toHaveValue('Анна Козлова');
+  });
+  it('доска на телефоне: фильтры свёрнуты под кнопку, «Доступные только мне» виден сразу', async () => {
+    mockFetch({ 'GET /api/users': [] });
+    const first = renderWithProviders(
+      <BoardFilters value={{}} onChange={() => {}} onlyMine onOnlyMineChange={() => {}} />,
+    );
+
+    expect(screen.getByRole('switch', { name: 'Доступные только мне' })).toBeVisible();
+    const toggle = screen.getByRole('button', { name: 'Фильтры' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('textbox', { name: 'Оффер' })).toBeInTheDocument();
+
+    // Число активных фильтров — на кнопке
+    first.unmount();
+    renderWithProviders(
+      <BoardFilters
+        value={{ offer: 'Pin', overdue: true }}
+        onChange={() => {}}
+        onlyMine
+        onOnlyMineChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Фильтры (2)' })).toBeInTheDocument();
   });
 });

@@ -85,6 +85,15 @@ describe('describeEvent', () => {
     expect(describeEvent(event('resubmitted')).details).toEqual([]);
   });
 
+  it('кредиты в истории — в том же формате, что везде', () => {
+    const added = event('ai_usage_added', { service: 'Midjourney', credits: '12.5', user: 'Иван' });
+    expect(describeEvent(added).details).toEqual(['Midjourney: 12,5 кр. (Иван)']);
+    const updated = event('ai_usage_updated', {
+      changes: [{ field: 'credits', old: '12.5', new: '1500' }],
+    });
+    expect(describeEvent(updated).details).toEqual(['Кредиты: 12,5 → 1 500']);
+  });
+
   it('вложение-результат', () => {
     expect(
       describeEvent(event('attachment_added', { kind: 'result', name: 'v2.mp4' })),

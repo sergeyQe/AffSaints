@@ -1,5 +1,9 @@
 import type { CreativeType, Priority, TaskEvent } from '../api/tasks';
+import { formatCredits } from './format';
 import { CREATIVE_TYPE_LABELS, formatDateTime, PRIORITY_LABELS, STATUS_LABELS } from './tasks';
+
+// Кредиты в истории приходят строкой из backend («12.5») — показываем как везде: «12,5»
+const credits = (v: unknown) => (Number.isFinite(Number(v)) ? formatCredits(Number(v)) : String(v));
 
 const FIELD_NAMES: Record<string, string> = {
   offer: 'Оффер',
@@ -25,6 +29,7 @@ function formatValue(field: string, value: unknown): string {
   if (field === 'creative_type')
     return CREATIVE_TYPE_LABELS[value as CreativeType] ?? String(value);
   if (field === 'deadline') return formatDateTime(String(value));
+  if (field === 'credits') return credits(value);
   return String(value);
 }
 
@@ -102,11 +107,11 @@ const FORMATTERS: Record<string, Formatter> = {
   attachment_removed: (p) => text(`Удалён ${kindName(p)}`, 'gray', [str(p.name)]),
   ai_usage_added: (p) =>
     text('Указан расход AI', 'indigo', [
-      `${str(p.service)}: ${str(p.credits)} кр. (${str(p.user)})`,
+      `${str(p.service)}: ${credits(p.credits)} кр. (${str(p.user)})`,
     ]),
   ai_usage_updated: (p) => text('Изменён расход AI', 'indigo', changes(p)),
   ai_usage_removed: (p) =>
-    text('Удалён расход AI', 'gray', [`${str(p.service)}: ${str(p.credits)} кр.`]),
+    text('Удалён расход AI', 'gray', [`${str(p.service)}: ${credits(p.credits)} кр.`]),
 };
 
 /** Текст события истории — нейтральный по форме (без «создал/создала»). */

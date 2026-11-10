@@ -1,10 +1,11 @@
-import { Button, Group, Select, Switch, TextInput } from '@mantine/core';
+import { Button, Collapse, Group, Select, Stack, Switch, TextInput } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconSearch, IconX } from '@tabler/icons-react';
+import { IconFilter, IconSearch, IconX } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import type { Priority, TaskFilters } from '../../api/tasks';
 import { useUsers } from '../../api/users';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { PRIORITY_LABELS, toOptions } from '../../lib/tasks';
 
 interface Props {
@@ -49,12 +50,39 @@ export function BoardFilters({ value, onChange, onlyMine, onOnlyMineChange }: Pr
   const set = (patch: Partial<TaskFilters>) => onChange({ ...value, ...patch });
   const userOptions = (list?: { id: number; full_name: string }[]) =>
     (list ?? []).map((u) => ({ value: String(u.id), label: u.full_name }));
-  const hasFilters = Object.values(value).some((v) => v !== undefined && v !== null && v !== '');
+  const activeCount = Object.values(value).filter(
+    (v) => v !== undefined && v !== null && v !== '',
+  ).length;
   // Сброс пересоздаёт текстовые поля — они очищаются без синхронизации через эффект
   const [resetKey, setResetKey] = useState(0);
+  // На телефоне фильтры свёрнуты: иначе они занимают весь первый экран над карточками
+  const isMobile = useIsMobile();
+  const [opened, setOpened] = useState(false);
 
-  return (
-    <Group gap="xs" wrap="wrap">
+  const onlyMineSwitch = onOnlyMineChange && (
+    <Switch
+      size="md"
+      label="Доступные только мне"
+      checked={!!onlyMine}
+      onChange={(e) => onOnlyMineChange(e.currentTarget.checked)}
+    />
+  );
+  const resetButton = activeCount > 0 && (
+    <Button
+      variant="subtle"
+      color="gray"
+      size="xs"
+      leftSection={<IconX size={14} />}
+      onClick={() => {
+        setResetKey((k) => k + 1);
+        onChange({});
+      }}
+    >
+      Сбросить
+    </Button>
+  );
+  const fields = (
+    <>
       <DebouncedInput
         key={`offer-${resetKey}`}
         label="Оффер"
@@ -102,28 +130,40 @@ export function BoardFilters({ value, onChange, onlyMine, onOnlyMineChange }: Pr
         checked={!!value.overdue}
         onChange={(e) => set({ overdue: e.currentTarget.checked || undefined })}
       />
-      {onOnlyMineChange && (
-        <Switch
-          size="md"
-          label="Доступные только мне"
-          checked={!!onlyMine}
-          onChange={(e) => onOnlyMineChange(e.currentTarget.checked)}
-        />
-      )}
-      {hasFilters && (
+    </>
+  );
+
+  if (!isMobile) {
+    return (
+      <Group gap="xs" wrap="wrap">
+        {fields}
+        {onlyMineSwitch}
+        {resetButton}
+      </Group>
+    );
+  }
+
+  // Телефон: кнопка «Фильтры (N)» и всегда видимый «Доступные только мне»; поля — под кнопкой
+  return (
+    <Stack gap="xs">
+      <Group justify="space-between" gap="xs">
         <Button
-          variant="subtle"
-          color="gray"
-          size="xs"
-          leftSection={<IconX size={14} />}
-          onClick={() => {
-            setResetKey((k) => k + 1);
-            onChange({});
-          }}
+          variant="light"
+          size="sm"
+          leftSection={<IconFilter size={16} />}
+          aria-expanded={opened}
+          onClick={() => setOpened((o) => !o)}
         >
-          Сбросить
+          {activeCount ? `Фильтры (${activeCount})` : 'Фильтры'}
         </Button>
-      )}
-    </Group>
+        {onlyMineSwitch}
+      </Group>
+      <Collapse expanded={opened}>
+        <Group gap="xs" wrap="wrap">
+          {fields}
+          {resetButton}
+        </Group>
+      </Collapse>
+    </Stack>
   );
 }
