@@ -17,6 +17,7 @@ export type TaskAction =
   | 'reopen'
   | 'reassign'
   | 'unassign'
+  | 'move'
   | 'add_reference'
   | 'add_result'
   | 'manage_ai_usage';
@@ -168,7 +169,15 @@ export type TransitionVars =
   | { id: number; action: 'take' | 'submit' | 'accept' | 'unassign' }
   | { id: number; action: 'request-revision' | 'reopen'; comment: string }
   | { id: number; action: 'cancel'; reason: string }
-  | { id: number; action: 'assign' | 'reassign'; assignee_id: number };
+  | { id: number; action: 'assign' | 'reassign'; assignee_id: number }
+  // Перенос руководителем в любую колонку: исполнитель — при уходе из «Новых»
+  | {
+      id: number;
+      action: 'move';
+      status: TaskStatus;
+      assignee_id?: number;
+      comment?: string;
+    };
 
 export function useTransition(handlers: MutationHandlers<TransitionVars> = {}) {
   return useTaskMutation(

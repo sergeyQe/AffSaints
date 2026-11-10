@@ -11,6 +11,7 @@ from app.models.user import Role, User
 from app.schemas.task import (
     CommentIn,
     EventOut,
+    MoveIn,
     ReasonIn,
     ReassignIn,
     TaskCreate,
@@ -174,3 +175,9 @@ async def reassign(
 @router.post("/{task_id}/unassign")
 async def unassign(task_id: int, session: Session, user: CurrentUser) -> TaskDetail:
     return await to_detail(session, await service.unassign(session, task_id, user), user)
+
+
+@router.post("/{task_id}/move")
+async def move(task_id: int, body: MoveIn, session: Session, user: CurrentUser) -> TaskDetail:
+    task = await service.move(session, task_id, user, body.status, body.assignee_id, body.comment)
+    return await to_detail(session, task, user)

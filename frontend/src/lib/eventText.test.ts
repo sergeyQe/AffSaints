@@ -61,6 +61,22 @@ describe('describeEvent', () => {
     });
   });
 
+  it('перенос руководителем со сменой исполнителя и правками', () => {
+    const payload = {
+      from: { full_name: 'Иван' },
+      assignee: { full_name: 'Мария' },
+      round: 2,
+      comment: 'Другой хук',
+    };
+    expect(describeEvent(event('moved', payload))).toMatchObject({
+      title: 'Руководитель перенёс задачу',
+      details: ['Исполнитель: Иван → Мария', 'Круг правок 2', '«Другой хук»'],
+    });
+    expect(describeEvent(event('moved', { from: { full_name: 'Иван' } })).details).toEqual([
+      'Снят исполнитель: Иван',
+    ]);
+  });
+
   it('вложение-результат', () => {
     expect(
       describeEvent(event('attachment_added', { kind: 'result', name: 'v2.mp4' })),

@@ -12,7 +12,6 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, and_, case, func, or_, select
-from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
@@ -20,9 +19,7 @@ from app.core.sql import LIKE_ESCAPE, contains_pattern
 from app.models.ai import AiService, AiUsage
 from app.models.task import (
     ACTIVE_STATUSES,
-    EventType,
     Task,
-    TaskEvent,
     TaskStatus,
     WorkInterval,
 )
@@ -231,21 +228,15 @@ async def _overdue(
 ) -> OverdueStats:
     f = _task_filters(q, by_assignee=False)
 
-    # Кто сдал первым — по истории (исполнителя могли сменить после сдачи)
-    first_submitter = (
-        select(TaskEvent.task_id, TaskEvent.actor_id)
-        .where(TaskEvent.type == EventType.SUBMITTED.value)
-        .ext(distinct_on(TaskEvent.task_id))
-        .order_by(TaskEvent.task_id, TaskEvent.created_at, TaskEvent.id)
-        .subquery()
-    )
+    # Сданные — за исполнителем на момент первой сдачи (его могли сменить позже;
+    # сдачу переносом руководителя тоже засчитываем исполнителю), несданные — за текущим
     submitted = Task.first_submitted_at.is_not(None)
     kind = case(
         (and_(submitted, Task.first_submitted_at > Task.deadline_at_first_submit), "late"),
         (submitted, "on_time"),
         else_="missed",
     )
-    executor = case((submitted, first_submitter.c.actor_id), else_=Task.assignee_id)
+    executor = case((submitted, Task.first_submitted_by_id), else_=Task.assignee_id)
     # Дедлайн в периоде: у сданных — дедлайн на момент первой сдачи, у несданных — текущий и уже прошёл
     in_period = or_(
         and_(submitted, _between(Task.deadline_at_first_submit, q)),
@@ -254,7 +245,6 @@ async def _overdue(
     classified = (
         select(kind.label("kind"), executor.label("user_id"))
         .select_from(Task)
-        .outerjoin(first_submitter, first_submitter.c.task_id == Task.id)
         .where(Task.status != TaskStatus.CANCELLED.value, in_period, *f)
         .subquery()
     )

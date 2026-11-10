@@ -69,6 +69,20 @@ class ReassignIn(BaseModel):
     assignee_id: int
 
 
+class MoveIn(BaseModel):
+    """Перенос карточки руководителем: исполнитель — если задача уходит из «Новых»,
+    комментарий — для правок (необязателен)."""
+
+    status: TaskStatus
+    assignee_id: int | None = None
+    comment: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("comment")
+    @classmethod
+    def _blank_is_none(cls, v: str | None) -> str | None:
+        return (v or "").strip() or None
+
+
 class TaskOut(BaseModel):
     id: int
     offer: str

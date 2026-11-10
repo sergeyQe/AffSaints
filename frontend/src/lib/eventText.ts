@@ -58,6 +58,17 @@ const text = (title: string, color: string, details: string[] = []): EventText =
   color,
 });
 
+// Перенос руководителем: смена исполнителя, круг правок и комментарий — если были
+const movedDetails = (p: Payload) => {
+  const details: string[] = [];
+  if (p.from && p.assignee) details.push(`Исполнитель: ${person(p.from)} → ${person(p.assignee)}`);
+  else if (p.assignee) details.push(`Исполнитель: ${person(p.assignee)}`);
+  else if (p.from) details.push(`Снят исполнитель: ${person(p.from)}`);
+  if (p.round) details.push(`Круг правок ${String(p.round)}`);
+  if (p.comment) details.push(`«${str(p.comment)}»`);
+  return details;
+};
+
 /**
  * Реестр «тип события → как его показать». Новый тип события — новая строка здесь,
  * общая функция describeEvent не меняется.
@@ -80,6 +91,7 @@ const FORMATTERS: Record<string, Formatter> = {
   reassigned: (p) => text('Исполнитель заменён', 'grape', [`${person(p.from)} → ${person(p.to)}`]),
   unassigned: (p) =>
     text('Исполнитель снят, задача вернулась в пул', 'grape', [`Был: ${person(p.from)}`]),
+  moved: (p) => text('Руководитель перенёс задачу', 'grape', movedDetails(p)),
   attachment_added: (p) => text(`Добавлен ${kindName(p)}`, 'cyan', [str(p.name)]),
   attachment_removed: (p) => text(`Удалён ${kindName(p)}`, 'gray', [str(p.name)]),
   ai_usage_added: (p) =>

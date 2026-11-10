@@ -126,6 +126,7 @@ export function BoardPage() {
         <ReassignModal
           key={`board-assign-${assign.task.id}`}
           task={assign.task}
+          target={assign.target ?? undefined}
           opened
           loading={assign.isPending}
           onClose={assign.cancel}

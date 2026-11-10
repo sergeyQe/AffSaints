@@ -35,6 +35,23 @@ describe('dropAction', () => {
     expect(allowedTargets(task('done', ['manage_ai_usage']))).toEqual([]);
   });
 
+  it('руководитель переносит карточку в любую колонку', () => {
+    // Штатные действия в приоритете, остальные колонки — переносом
+    const review = task('review', ['accept', 'request_revision', 'unassign', 'move']);
+    expect(dropAction(review, 'done')).toBe('accept');
+    expect(dropAction(review, 'in_progress')).toBe('move');
+    expect(allowedTargets(review)).toEqual(['in_progress', 'done', 'revision', 'new']);
+    const fresh = task('new', ['assign', 'move']);
+    expect(dropAction(fresh, 'done')).toBe('move');
+    expect(dropAction(fresh, 'new')).toBeNull();
+    expect(allowedTargets(task('done', ['move']))).toEqual([
+      'in_progress',
+      'review',
+      'revision',
+      'new',
+    ]);
+  });
+
   it('без права на действие перенос запрещён', () => {
     // Байер видит новую задачу, но взять её не может
     expect(dropAction(task('new', ['edit', 'cancel']), 'in_progress')).toBeNull();

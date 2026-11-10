@@ -21,6 +21,8 @@ STATUS_LABELS = {
 }
 
 OPEN_STATUSES = frozenset(TaskStatus) - CLOSED_STATUSES
+# Колонки доски: всё, кроме отменённых
+BOARD_STATUSES = frozenset(TaskStatus) - {TaskStatus.CANCELLED}
 
 # Проверка «кто»: возвращает текст отказа или None, если можно
 WhoCheck = Callable[[Task, User], str | None]
@@ -105,6 +107,8 @@ RULES: dict[Action, Rule] = {
     Action.REASSIGN: Rule(ACTIVE_STATUSES, _head),
     # В пул — из работы, правок и с проверки (результат прежнего исполнителя новому не засчитывается)
     Action.UNASSIGN: Rule(ACTIVE_STATUSES, _head),
+    # Руководитель переносит карточку в любую колонку доски (отмена — только с причиной)
+    Action.MOVE: Rule(BOARD_STATUSES, _head),
     Action.ADD_REFERENCE: Rule(OPEN_STATUSES, _author_or_head),
     Action.ADD_RESULT: Rule(frozenset({TaskStatus.IN_PROGRESS, TaskStatus.REVISION}), _assignee),
     # Расходы: исполнитель до закрытия задачи; руководитель — всегда (решение №15)

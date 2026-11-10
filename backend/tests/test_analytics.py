@@ -262,3 +262,22 @@ async def test_only_head_sees_analytics(as_user: AsUser, role: Role) -> None:
 async def test_query_validation(as_user: AsUser, params: dict[str, str]) -> None:
     resp = await as_user(await create_user(Role.HEAD)).get("/api/analytics", params=params)
     assert resp.status_code == 422
+
+
+async def test_head_move_is_attributed_to_assignee(as_user: AsUser, fake_clock: FakeClock) -> None:
+    head = as_user(await create_user(Role.HEAD, full_name="Олег"))
+    buyer = as_user(await create_user(Role.BUYER))
+    ivan_u = await create_user(Role.CREATIVE, full_name="Иван")
+    tid = (await create_task(buyer, deadline=fake_clock.current + timedelta(hours=1)))["id"]
+    ok(await act(head, tid, "move", status="in_progress", assignee_id=ivan_u.id))
+    fake_clock.advance(hours=2)
+    ok(await act(head, tid, "move", status="done"))
+
+    # Сдача с опозданием, завершение и время — за исполнителем, не за руководителем
+    data = await analytics(head)
+    overdue = {r["user"]["full_name"]: r for r in data["overdue"]["by_executor"] if r["user"]}
+    assert overdue["Иван"]["late"] == 1
+    assert "Олег" not in overdue
+    workload = {r["user"]["full_name"]: r for r in data["workload"]}
+    assert workload["Иван"]["completed_in_period"] == 1
+    assert workload["Иван"]["avg_work_seconds"] == 2 * 60 * 60

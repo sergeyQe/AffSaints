@@ -48,6 +48,8 @@ class Action(StrEnum):
     REOPEN = "reopen"
     REASSIGN = "reassign"
     UNASSIGN = "unassign"
+    # Руководитель переносит карточку в любую колонку доски
+    MOVE = "move"
     ADD_REFERENCE = "add_reference"
     ADD_RESULT = "add_result"
     MANAGE_AI_USAGE = "manage_ai_usage"
@@ -115,6 +117,8 @@ class Task(Base):
     first_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Снимок дедлайна на момент первой сдачи: перенос дедлайна задним числом не стирает опоздание
     deadline_at_first_submit: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Кому засчитана первая сдача — исполнитель, даже если перенос сделал руководитель
+    first_submitted_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     last_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -153,6 +157,7 @@ class EventType(StrEnum):
     CANCELLED = "cancelled"
     REASSIGNED = "reassigned"
     UNASSIGNED = "unassigned"
+    MOVED = "moved"
     ATTACHMENT_ADDED = "attachment_added"
     ATTACHMENT_REMOVED = "attachment_removed"
     AI_USAGE_ADDED = "ai_usage_added"

@@ -1,8 +1,9 @@
 import { Button, Group, Modal, Select, Stack, Text } from '@mantine/core';
 import { useState } from 'react';
 
-import type { Task } from '../../api/tasks';
+import type { Task, TaskStatus } from '../../api/tasks';
 import { useUsers } from '../../api/users';
+import { STATUS_LABELS } from '../../lib/tasks';
 
 /**
  * Выбор исполнителя (только руководитель): назначение на новую задачу
@@ -14,8 +15,11 @@ export function ReassignModal({
   loading,
   onClose,
   onSubmit,
+  target = 'in_progress',
 }: {
   task: Task;
+  /** Колонка, куда уйдёт новая задача после назначения (перенос руководителем). */
+  target?: TaskStatus;
   opened: boolean;
   loading: boolean;
   onClose: () => void;
@@ -39,7 +43,7 @@ export function ReassignModal({
       <Stack>
         <Text size="sm" c="dimmed">
           {isAssign
-            ? 'Задача сразу перейдёт в «В работе» к выбранному креативщику.'
+            ? `Задача сразу перейдёт в «${STATUS_LABELS[target]}» к выбранному креативщику; время и результат засчитываются ему.`
             : `Сейчас: ${task.assignee?.full_name ?? '—'}. Время работы прежнего исполнителя сохранится за ним.`}
         </Text>
         <Select

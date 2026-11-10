@@ -4,7 +4,7 @@ import { BOARD_COLUMNS } from './tasks';
 /** Действие, которое выполняется при перетаскивании карточки в колонку. */
 export type DropAction = Extract<
   TaskAction,
-  'take' | 'assign' | 'submit' | 'accept' | 'request_revision' | 'reopen' | 'unassign'
+  'take' | 'assign' | 'submit' | 'accept' | 'request_revision' | 'reopen' | 'unassign' | 'move'
 >;
 
 // Переходы доски: (из статуса, в колонку) → действие backend.
@@ -25,16 +25,25 @@ const TRANSITIONS: { from: TaskStatus[]; to: TaskStatus; action: DropAction }[] 
  * Какое действие выполнит перенос карточки в колонку — или null, если перенос запрещён.
  * Права берутся из task.actions, которые прислал backend: фронт их не вычисляет.
  */
-export function dropAction(task: Pick<Task, 'status' | 'actions'>, target: TaskStatus) {
+export function dropAction(
+  task: Pick<Task, 'status' | 'actions'>,
+  target: TaskStatus,
+): DropAction | null {
   const transition = TRANSITIONS.find(
     (t) => t.from.includes(task.status) && t.to === target && task.actions.includes(t.action),
   );
-  return transition?.action ?? null;
+  if (transition) return transition.action;
+  // Штатного перехода нет — руководитель всё равно переносит карточку в любую другую колонку
+  if (task.actions.includes('move') && target !== task.status && BOARD_COLUMNS.includes(target))
+    return 'move';
+  return null;
 }
 
 /** Колонки, куда эту карточку можно перетащить. */
 export function allowedTargets(task: Pick<Task, 'status' | 'actions'>): TaskStatus[] {
-  const targets = TRANSITIONS.filter((t) => dropAction(task, t.to) !== null).map((t) => t.to);
+  const targets = [...TRANSITIONS.map((t) => t.to), ...BOARD_COLUMNS].filter(
+    (to) => dropAction(task, to) !== null,
+  );
   return [...new Set(targets)];
 }
 

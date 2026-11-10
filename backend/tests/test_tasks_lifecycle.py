@@ -3,8 +3,9 @@
 import asyncio
 from collections.abc import Callable
 from datetime import timedelta
+from typing import Any
 
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 
 from app.models.user import Role, User
 from tests.conftest import FakeClock
@@ -538,3 +539,110 @@ async def test_deadline_shift_is_tracked(as_user: AsUser, fake_clock: FakeClock)
     assert change["field"] == "deadline"
     assert change["old"].startswith(deadline.isoformat()[:19])
     assert change["new"].startswith(new_deadline.isoformat()[:19])
+
+
+async def move(client: AsyncClient, task_id: int, status: str, **body: Any) -> Response:
+    return await act(client, task_id, "move", status=status, **body)
+
+
+async def test_head_moves_new_task_straight_to_done(as_user: AsUser, fake_clock: FakeClock) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head_user = await create_user(Role.HEAD)
+    head = as_user(head_user)
+    creative_user = await create_user(Role.CREATIVE)
+    tid = (await create_task(buyer))["id"]
+    assert "move" in ok(await head.get(f"/api/tasks/{tid}"))["actions"]
+    assert "move" not in ok(await buyer.get(f"/api/tasks/{tid}"))["actions"]
+
+    # Не руководитель переносить не может; из «Новых» — только с исполнителем
+    assert (await move(buyer, tid, "done")).status_code == 403
+    resp = await move(head, tid, "done")
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "assignee_required"
+
+    t = ok(await move(head, tid, "done", assignee_id=creative_user.id))
+    assert t["status"] == "done"
+    assert t["assignee"]["id"] == creative_user.id
+    assert t["completed_at"] is not None
+    # Сдача засчитана исполнителю, без результата — руководитель переносит принудительно
+    assert t["first_submitted_at"] is not None
+
+    events = ok(await head.get(f"/api/tasks/{tid}/events"))
+    moved = events[-1]
+    assert moved["type"] == "moved"
+    assert (moved["from_status"], moved["to_status"]) == ("new", "done")
+    assert moved["actor"]["id"] == head_user.id
+    assert moved["payload"]["assignee"]["id"] == creative_user.id
+
+
+async def test_head_moves_between_any_columns_keeping_work_time(
+    as_user: AsUser, fake_clock: FakeClock
+) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head = as_user(await create_user(Role.HEAD))
+    creative = as_user(await create_user(Role.CREATIVE))
+    tid = (await create_task(buyer))["id"]
+    ok(await act(creative, tid, "take"))
+    fake_clock.advance(hours=1)
+
+    # В работе → На проверке без результата: отрезок работы закрыт за исполнителем
+    t = ok(await move(head, tid, "review"))
+    assert t["status"] == "review"
+    assert t["work_seconds"] == 60 * 60
+    fake_clock.advance(hours=3)
+
+    # На проверке → В работе: работа продолжается у того же исполнителя
+    t = ok(await move(head, tid, "in_progress"))
+    assert t["status"] == "in_progress"
+    fake_clock.advance(minutes=30)
+
+    # В работе → Правки с комментарием: новый круг, время идёт как правка
+    t = ok(await move(head, tid, "revision", comment="  Другой хук  "))
+    assert t["status"] == "revision"
+    assert t["revision_count"] == 1
+    assert t["revision_comment"] == "Другой хук"
+    fake_clock.advance(minutes=30)
+
+    # Правки → Готово → Новые: из «Готово» в пул, дата завершения снимается
+    t = ok(await move(head, tid, "done"))
+    assert t["completed_at"] is not None
+    assert t["work_seconds"] == 2 * 60 * 60
+    t = ok(await move(head, tid, "new"))
+    assert t["status"] == "new"
+    assert t["assignee"] is None
+    assert t["completed_at"] is None
+    assert t["work_seconds"] == 2 * 60 * 60
+
+    # Та же колонка и отмена переносом недоступны
+    assert (await move(head, tid, "new")).status_code == 409
+    assert (await move(head, tid, "cancelled")).status_code == 400
+
+
+async def test_move_with_new_assignee_switches_responsible(
+    as_user: AsUser, fake_clock: FakeClock
+) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head = as_user(await create_user(Role.HEAD))
+    first_user = await create_user(Role.CREATIVE)
+    first = as_user(first_user)
+    second_user = await create_user(Role.CREATIVE)
+    tid = (await create_task(buyer))["id"]
+    ok(await act(first, tid, "take"))
+    fake_clock.advance(hours=1)
+
+    # Перенос с выбором другого исполнителя: время первого остаётся за ним, правки — у второго
+    t = ok(await move(head, tid, "revision", assignee_id=second_user.id))
+    assert t["assignee"]["id"] == second_user.id
+    assert t["revision_comment"] is None
+    payload = ok(await head.get(f"/api/tasks/{tid}/events"))[-1]["payload"]
+    assert payload["from"]["id"] == first_user.id
+    assert payload["assignee"]["id"] == second_user.id
+    assert payload["round"] == 1
+
+
+async def test_move_not_allowed_for_cancelled(as_user: AsUser) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head = as_user(await create_user(Role.HEAD))
+    tid = (await create_task(buyer))["id"]
+    ok(await act(buyer, tid, "cancel", reason="Не нужна"))
+    assert (await move(head, tid, "new")).status_code == 409

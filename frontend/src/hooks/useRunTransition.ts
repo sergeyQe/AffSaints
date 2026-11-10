@@ -12,6 +12,7 @@ const SUCCESS_TEXT: Record<TransitionVars['action'], string> = {
   cancel: 'Задача отменена',
   reassign: 'Исполнитель заменён',
   unassign: 'Задача возвращена в общий пул',
+  move: 'Задача перенесена',
 };
 
 /**

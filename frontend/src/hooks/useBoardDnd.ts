@@ -9,9 +9,16 @@ import {
 } from '@dnd-kit/core';
 import { useState } from 'react';
 
-import type { Task, TaskStatus } from '../api/tasks';
-import { allowedTargets, dropAction } from '../lib/taskFlow';
+import type { Task, TaskStatus, TransitionVars } from '../api/tasks';
+import { allowedTargets, dropAction, type DropAction } from '../lib/taskFlow';
 import { useRunTransition } from './useRunTransition';
+
+/** Перенос, которому нужен ввод в окне: карточка, колонка и действие backend. */
+interface Pending {
+  task: Task;
+  target: TaskStatus;
+  action: DropAction;
+}
 
 /**
  * Перетаскивание на доске: какая карточка в руке, куда её можно положить,
@@ -20,9 +27,9 @@ import { useRunTransition } from './useRunTransition';
 export function useBoardDnd(onResultRequired: (taskId: number) => void) {
   const [dragged, setDragged] = useState<Task | null>(null);
   // Правкам нужен комментарий — перенос в «Правки» (с проверки или из «Готово») открывает окно ввода
-  const [revisionFor, setRevisionFor] = useState<Task | null>(null);
-  // Назначению нужен исполнитель — перенос руководителем открывает выбор креативщика
-  const [assignFor, setAssignFor] = useState<Task | null>(null);
+  const [revisionFor, setRevisionFor] = useState<Pending | null>(null);
+  // Назначению нужен исполнитель — перенос руководителем из «Новых» открывает выбор креативщика
+  const [assignFor, setAssignFor] = useState<Pending | null>(null);
   const { run, isPending } = useRunTransition(onResultRequired);
 
   const sensors = useSensors(
@@ -40,48 +47,62 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
     const task = dragged;
     setDragged(null);
     if (!task || !e.over) return;
-    const action = dropAction(task, e.over.id as TaskStatus);
+    const target = e.over.id as TaskStatus;
+    const action = dropAction(task, target);
     if (!action) return;
-    // Переходы, которым нужен ввод, сначала открывают окно
-    if (action === 'request_revision' || action === 'reopen') {
-      setRevisionFor(task);
+    const pending = { task, target, action };
+    // Из «Новых» в любую колонку нужен исполнитель — сначала окно выбора
+    if (action === 'assign' || (action === 'move' && task.status === 'new')) {
+      setAssignFor(pending);
       return;
     }
-    if (action === 'assign') {
-      setAssignFor(task);
+    // Правкам нужен комментарий — сначала окно ввода
+    if (action === 'request_revision' || action === 'reopen' || target === 'revision') {
+      setRevisionFor(pending);
+      return;
+    }
+    if (action === 'move') {
+      run({ id: task.id, action, status: target });
       return;
     }
     run({ id: task.id, action });
   };
 
-  // Из «Готово» — возврат принятой работы, с проверки — обычные правки
-  const submitRevision = (comment: string) =>
-    revisionFor &&
-    run(
-      {
-        id: revisionFor.id,
-        action: revisionFor.status === 'done' ? 'reopen' : 'request-revision',
-        comment,
-      },
-      () => setRevisionFor(null),
-    );
+  // Из «Готово» — возврат принятой работы, с проверки — обычные правки, иначе — перенос
+  const submitRevision = (comment: string) => {
+    if (!revisionFor) return;
+    const { task, target, action } = revisionFor;
+    const vars: TransitionVars =
+      action === 'move'
+        ? { id: task.id, action, status: target, comment }
+        : { id: task.id, action: action === 'reopen' ? 'reopen' : 'request-revision', comment };
+    run(vars, () => setRevisionFor(null));
+  };
 
-  const submitAssign = (assigneeId: number) =>
-    assignFor &&
-    run({ id: assignFor.id, action: 'assign', assignee_id: assigneeId }, () => setAssignFor(null));
+  // В «В работе» — обычное назначение, в другие колонки — перенос с исполнителем
+  const submitAssign = (assigneeId: number) => {
+    if (!assignFor) return;
+    const { task, target, action } = assignFor;
+    const vars: TransitionVars =
+      action === 'assign'
+        ? { id: task.id, action, assignee_id: assigneeId }
+        : { id: task.id, action: 'move', status: target, assignee_id: assigneeId };
+    run(vars, () => setAssignFor(null));
+  };
 
   return {
     dragged,
     targets: dragged ? allowedTargets(dragged) : [],
     dndProps: { sensors, onDragStart, onDragEnd, onDragCancel: () => setDragged(null) },
     revision: {
-      task: revisionFor,
+      task: revisionFor?.task ?? null,
       isPending,
       submit: submitRevision,
       cancel: () => setRevisionFor(null),
     },
     assign: {
-      task: assignFor,
+      task: assignFor?.task ?? null,
+      target: assignFor?.target ?? null,
       isPending,
       submit: submitAssign,
       cancel: () => setAssignFor(null),

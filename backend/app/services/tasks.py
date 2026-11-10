@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
-from app.core.errors import AppError
+from app.core.errors import AppError, Conflict
 from app.models.attachment import AttachmentKind, TaskAttachment
 from app.models.task import Action, EventType, Task, TaskStatus, WorkKind
 from app.models.user import Role, User
@@ -56,6 +56,15 @@ def _set_status(task: Task, status: TaskStatus, now: datetime) -> str:
     task.status = status.value
     task.updated_at = now
     return previous
+
+
+def _record_submit(task: Task, submitter_id: int, now: datetime) -> None:
+    """Сдача работы: первая фиксирует просрочку за исполнителем (решение №12), последняя — время."""
+    if task.first_submitted_at is None:
+        task.first_submitted_at = now
+        task.deadline_at_first_submit = task.deadline
+        task.first_submitted_by_id = submitter_id
+    task.last_submitted_at = now
 
 
 # ---------- создание и редактирование ----------
@@ -189,10 +198,7 @@ async def submit(session: AsyncSession, task_id: int, user: User) -> Task:
     await close_interval(session, task, now)
     is_resubmit = task.status == TaskStatus.REVISION.value
     previous = _set_status(task, TaskStatus.REVIEW, now)
-    if task.first_submitted_at is None:
-        task.first_submitted_at = now
-        task.deadline_at_first_submit = task.deadline
-    task.last_submitted_at = now
+    _record_submit(task, user.id, now)
     add_event(
         session,
         task,
@@ -330,6 +336,103 @@ async def unassign(session: AsyncSession, task_id: int, user: User) -> Task:
         user,
         EventType.UNASSIGNED,
         from_status=previous,
+        to_status=task.status,
+        **payload,
+    )
+    await session.commit()
+    return task
+
+
+# ---------- перенос руководителем ----------
+
+# Колонки, в которых исполнитель работает над задачей (идёт отрезок работы)
+_WORKING_KIND = {TaskStatus.IN_PROGRESS: WorkKind.WORK, TaskStatus.REVISION: WorkKind.REVISION}
+
+
+async def move(
+    session: AsyncSession,
+    task_id: int,
+    user: User,
+    target: TaskStatus,
+    assignee_id: int | None = None,
+    comment: str | None = None,
+) -> Task:
+    """Руководитель переносит карточку в любую колонку доски.
+
+    Всё, что попадает в аналитику (время, сдача, завершение), засчитывается исполнителю —
+    ответственному по задаче, а не руководителю, который сделал перенос.
+    """
+    task = await lock_task(session, task_id)
+    ensure_allowed(Action.MOVE, task, user)
+
+    # Отмена — отдельным действием с причиной; перенос в ту же колонку ничего не меняет
+    if target == TaskStatus.CANCELLED:
+        raise AppError("invalid_target", "Чтобы отменить задачу, укажите причину отмены")
+    if target == task.status_enum:
+        raise Conflict("invalid_target", "Задача уже в этой колонке")
+
+    now = clock.now()
+    previous_status = task.status_enum
+    previous_assignee = task.assignee
+
+    # Исполнитель: выбранный руководителем или текущий; без исполнителя — только «Новые»
+    assignee = previous_assignee
+    if target != TaskStatus.NEW and assignee_id is not None and assignee_id != task.assignee_id:
+        assignee = await _validate_assignee(session, task, assignee_id)
+    if target != TaskStatus.NEW and assignee is None:
+        raise AppError("assignee_required", "Выберите исполнителя: без него задача — в «Новых»")
+
+    # Открытый отрезок работы закрывается за тем, кто работал до переноса
+    await close_interval(session, task, now)
+    _set_status(task, target, now)
+    if target != TaskStatus.DONE:
+        task.completed_at = None
+
+    payload: dict[str, Any] = {}
+    if target == TaskStatus.NEW:
+        # Возврат в пул: исполнитель снимается, его время сохраняется за ним
+        task.assignee_id = None
+        task.assignee = None
+        payload["from"] = user_ref(previous_assignee)
+    else:
+        assert assignee is not None
+        task.assignee_id = assignee.id
+        task.assignee = assignee
+        payload["assignee"] = user_ref(assignee)
+        if previous_assignee is not None and previous_assignee.id != assignee.id:
+            payload["from"] = user_ref(previous_assignee)
+
+        # Из пула — как взятие: время взятия, актуальное ТЗ
+        if previous_status == TaskStatus.NEW:
+            task.taken_at = now
+            task.brief_updated_at = None
+
+        # В работе / Правки — идёт отрезок работы исполнителя; правки — новый круг
+        kind = _WORKING_KIND.get(target)
+        if kind is not None:
+            if target == TaskStatus.REVISION:
+                task.revision_count += 1
+                task.revision_comment = comment
+                payload["round"] = task.revision_count
+            open_interval(session, task, assignee.id, kind, now)
+
+        # Из работы сразу на проверку или в «Готово» — сдача засчитывается исполнителю
+        if target in (TaskStatus.REVIEW, TaskStatus.DONE) and previous_status not in (
+            TaskStatus.REVIEW,
+            TaskStatus.DONE,
+        ):
+            _record_submit(task, assignee.id, now)
+        if target == TaskStatus.DONE:
+            task.completed_at = now
+
+    if comment:
+        payload["comment"] = comment
+    add_event(
+        session,
+        task,
+        user,
+        EventType.MOVED,
+        from_status=previous_status.value,
         to_status=task.status,
         **payload,
     )
