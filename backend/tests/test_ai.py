@@ -236,3 +236,36 @@ async def test_usage_not_found(as_user: AsUser) -> None:
     assert (await head.patch("/api/ai-usage/999", json={"credits": 1})).status_code == 404
     assert (await head.delete("/api/ai-usage/999")).status_code == 404
     assert (await head.get("/api/tasks/999/ai-usage")).status_code == 404
+
+
+async def test_usage_remembers_revision_round(as_user: AsUser) -> None:
+    head = as_user(await create_user(Role.HEAD))
+    buyer = as_user(await create_user(Role.BUYER))
+    creative = as_user(await create_user(Role.CREATIVE))
+    mj = await add_service(head, "Midjourney")
+    tid = (await create_task(buyer))["id"]
+    ok(await act(creative, tid, "take"))
+
+    # Первая версия — круг 0, в том числе пока работа на проверке
+    first = ok(await add_usage(creative, tid, mj["id"], 10), 201)
+    ok(await submit_work(creative, tid))
+    on_review = ok(await add_usage(creative, tid, mj["id"], 1), 201)
+    # Правки №1 и возврат принятой работы (№2) — следующие круги
+    ok(await act(buyer, tid, "request-revision", comment="правки"))
+    revision = ok(await add_usage(creative, tid, mj["id"], 5), 201)
+    ok(await submit_work(creative, tid))
+    ok(await act(buyer, tid, "accept"))
+    ok(await act(head, tid, "reopen", comment="ещё раз"))
+    reopened = ok(await add_usage(creative, tid, mj["id"], 2), 201)
+
+    assert [first["round"], on_review["round"], revision["round"], reopened["round"]] == [
+        0,
+        0,
+        1,
+        2,
+    ]
+    # Правка записи круг не меняет
+    edited = ok(await creative.patch(f"/api/ai-usage/{revision['id']}", json={"credits": 6}))
+    assert edited["round"] == 1
+    items = ok(await buyer.get(f"/api/tasks/{tid}/ai-usage"))["items"]
+    assert [i["round"] for i in items] == [0, 0, 1, 2]

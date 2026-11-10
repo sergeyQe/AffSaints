@@ -37,8 +37,13 @@ test('полный цикл задачи от ТЗ до аналитики', asy
   await clickAction(creative, 'Взять в работу', 'Задача взята в работу');
   await expect(await statusBadge(creative)).toContainText('В работе');
 
-  // Сдать без результата нельзя — откроется вкладка файлов
-  await clickAction(creative, 'Сдать на проверку', 'Прикрепите результат работы перед сдачей');
+  // Без результата — окно «Материал не приложен»: без галочки сдать нельзя, ведём к файлам
+  await creative.getByRole('dialog').getByRole('button', { name: 'Сдать на проверку' }).click();
+  const noResult = creative.getByRole('dialog', { name: 'Материал не приложен' });
+  await expect(noResult.getByRole('checkbox', { name: 'Сдать без материала' })).not.toBeChecked();
+  await expect(noResult.getByRole('button', { name: 'Сдать', exact: true })).toBeDisabled();
+  await noResult.getByRole('button', { name: 'Приложить материал' }).click();
+  await expect(noResult).toBeHidden();
   await addResultLink(creative, 'https://drive.google.com/e2e-v1');
 
   const dialog = creative.getByRole('dialog');
@@ -88,11 +93,21 @@ test('полный цикл задачи от ТЗ до аналитики', asy
   // 6. Руководитель видит задачу и расход в аналитике (фильтр по офферу)
   const head = await loginAs(browser, 'head');
   await head.getByRole('link', { name: 'Аналитика' }).click();
-  await head.getByLabel('Оффер').fill(offer);
+  // Ждём переход: на доске под «Оффер» подходят и фильтр, и карточки «Задача N: E2E оффер…»
+  await expect(head).toHaveURL(/\/analytics/);
+  await head.getByRole('textbox', { name: 'Оффер', exact: true }).fill(offer);
   await expect(head.getByRole('group', { name: 'Создано' })).toContainText(/^Создано1/);
   await expect(head.getByRole('group', { name: 'Завершено' })).toContainText(/^Завершено1/);
-  const ai = head.getByRole('region', { name: 'Расходы AI-кредитов' });
-  await expect(ai.getByRole('cell', { name: '12,5' })).toBeVisible();
+  // Расход внесён до правок — в строке задачи он в «Первой версии», правок по нему нет
+  await head.getByRole('tab', { name: 'Учёт AI-расходов' }).click();
+  await expect(head).toHaveURL(/tab=ai/);
+  const byTask = head.getByRole('region', { name: 'По задачам' });
+  const row = byTask.getByRole('row').filter({ hasText: offer });
+  await expect(row.getByRole('cell').nth(3)).toHaveText('12,5');
+  await expect(row.getByRole('cell').nth(4)).toHaveText('0');
+  // Время работы — на вкладке «Учёт времени», фильтр по офферу сохранился
+  await head.getByRole('tab', { name: 'Учёт времени' }).click();
+  await expect(head.getByRole('region', { name: 'По задачам' }).getByText(offer)).toBeVisible();
 });
 
 test('байер-креативщик не может взять собственную задачу, другой креативщик — может', async ({

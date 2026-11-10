@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import Select, and_, or_, select
+from sqlalchemy import ColumnElement, Select, and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
@@ -12,14 +12,28 @@ from app.models.task import BOARD_ORDER, OverdueState, Task, TaskEvent, TaskStat
 from app.schemas.task import TaskFilters
 
 
+def is_late(submitted_at: datetime | None, deadline: datetime | None) -> bool:
+    """Опоздание (решение №12): первая сдача строго позже дедлайна, действовавшего в тот момент."""
+    return submitted_at is not None and deadline is not None and submitted_at > deadline
+
+
+def is_late_sql() -> ColumnElement[bool]:
+    """То же правило опоздания, что is_late, — выражением SQL для агрегатов аналитики."""
+    result: ColumnElement[bool] = and_(
+        Task.first_submitted_at.is_not(None),
+        Task.deadline_at_first_submit.is_not(None),
+        Task.first_submitted_at > Task.deadline_at_first_submit,
+    )
+    return result
+
+
 def overdue_state(task: Task, now: datetime) -> OverdueState:
     """Просрочка по первой сдаче (решение №12). Без дедлайна и для отменённых — нет."""
     if task.status == TaskStatus.CANCELLED:
         return "none"
     # Уже сдана: сравниваем с дедлайном, действовавшим в момент первой сдачи
     if task.first_submitted_at is not None:
-        deadline = task.deadline_at_first_submit
-        return "late" if deadline is not None and task.first_submitted_at > deadline else "none"
+        return "late" if is_late(task.first_submitted_at, task.deadline_at_first_submit) else "none"
     if task.deadline is None:
         return "none"
     return "current" if now > task.deadline else "none"

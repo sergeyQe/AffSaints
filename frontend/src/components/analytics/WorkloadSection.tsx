@@ -1,12 +1,12 @@
 import { BarChart } from '@mantine/charts';
 import { Stack, Table, Text } from '@mantine/core';
 
-import type { Analytics } from '../../api/analytics';
+import type { Overview } from '../../api/analytics';
 import { CHART_GRID, SERIES } from '../../lib/chartPalette';
 import { formatDurationOrDash } from '../../lib/format';
 import { EmptyState } from './ui';
 
-export function WorkloadSection({ data }: { data: Analytics }) {
+export function WorkloadSection({ data }: { data: Overview }) {
   if (!data.workload.length) return <EmptyState>Нет активных креативщиков.</EmptyState>;
   const chart = data.workload.map((w) => ({
     name: w.user.full_name,

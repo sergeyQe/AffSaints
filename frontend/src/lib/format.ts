@@ -27,5 +27,8 @@ export const isHttpUrl = (url: string) => /^https?:\/\/\S{3,}$/i.test(url.trim()
 /** Доля → «33%»; нет данных → «—». */
 export const formatPercent = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`);
 
+/** Среднее с одним знаком (правок на задачу): «1.4»; нет данных → «—». */
+export const formatDecimalOrDash = (v: number | null) => (v === null ? '—' : v.toFixed(1));
+
 /** Длительность в секундах или «—», если данных нет. */
 export const formatDurationOrDash = (s: number | null) => (s === null ? '—' : formatDuration(s));

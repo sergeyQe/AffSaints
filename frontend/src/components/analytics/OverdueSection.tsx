@@ -1,12 +1,12 @@
 import { SimpleGrid, Stack, Table, Text } from '@mantine/core';
 
-import type { Analytics } from '../../api/analytics';
+import type { TimeAnalytics } from '../../api/analytics';
 import { formatPercent } from '../../lib/format';
 import { EmptyState, StatTile } from './ui';
 
 const NOT_TAKEN = 'Не взята в работу';
 
-export function OverdueSection({ data }: { data: Analytics }) {
+export function OverdueSection({ data }: { data: Pick<TimeAnalytics, 'overdue'> }) {
   const o = data.overdue;
   return (
     <Stack>

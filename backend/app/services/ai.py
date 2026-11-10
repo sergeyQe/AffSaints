@@ -109,13 +109,14 @@ async def add_usage(
     service = await _active_service(session, data.service_id)
     assert task.assignee is not None  # гарантирует правило MANAGE_AI_USAGE
 
-    # Расход всегда записывается на исполнителя задачи
+    # Расход всегда записывается на исполнителя задачи и на текущий круг правок
     now = clock.now()
     usage = AiUsage(
         task_id=task.id,
         service_id=service.id,
         user_id=task.assignee.id,
         credits=data.credits,
+        round=task.revision_count,
         created_by_id=actor.id,
         created_at=now,
         updated_at=now,

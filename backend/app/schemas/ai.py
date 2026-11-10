@@ -55,6 +55,8 @@ class AiUsageOut(BaseModel):
     user: UserBrief
     # Число в JSON (Decimal по умолчанию сериализуется строкой)
     credits: float
+    # Круг правок: 0 — первая версия, 1, 2… — правки
+    round: int
     created_at: datetime
     updated_at: datetime
 

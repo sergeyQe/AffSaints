@@ -15,6 +15,8 @@ export interface AiUsage {
   service: AiService;
   user: UserBrief;
   credits: number;
+  /** Круг правок: 0 — первая версия, 1, 2… — правки. */
+  round: number;
   created_at: string;
   updated_at: string;
 }

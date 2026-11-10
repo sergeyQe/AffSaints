@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
@@ -40,7 +41,6 @@ class Summary(BaseModel):
     cancelled: int
     active_now: int
     overdue_now: int
-    avg_work_seconds: int | None
     revisions_per_task: float | None
 
 
@@ -79,10 +79,41 @@ class OverdueStats(BaseModel):
     by_executor: list[OverdueRow]
 
 
+class DayPoint(BaseModel):
+    day: date
+    created: int
+    completed: int
+
+
+class OverviewOut(BaseModel):
+    """Вкладка «Пользователи и задачи»."""
+
+    date_from: datetime
+    date_to: datetime
+    summary: Summary
+    by_status: list[StatusCount]
+    workload: list[WorkloadRow]
+    timeline: list[DayPoint]
+
+
+# ---------- учёт AI-расходов ----------
+
+
+class RoundCredits(BaseModel):
+    """Кредиты одного круга: 0 — первая версия, 1, 2… — правки."""
+
+    round: int
+    credits: float
+
+
 class ServiceCredits(BaseModel):
     service_id: int
     service: str
     credits: float
+    first_version: float
+    revisions: float
+    # Доля кредитов сервиса, потраченных на правки (0..1)
+    revision_share: float | None
 
 
 class ExecutorCredits(BaseModel):
@@ -90,25 +121,104 @@ class ExecutorCredits(BaseModel):
     service_id: int
     service: str
     credits: float
+    first_version: float
+    revisions: float
 
 
-class AiCredits(BaseModel):
-    by_service: list[ServiceCredits]
-    by_executor: list[ExecutorCredits]
+class TaskCredits(BaseModel):
+    task_id: int
+    offer: str
+    geo: str
+    user: UserBrief
+    service_id: int
+    service: str
+    credits: float
+    first_version: float
+    revisions: float
+    # Правки по кругам — для подсказки «№1: 10, №2: 5»
+    rounds: list[RoundCredits]
 
 
-class DayPoint(BaseModel):
-    day: date
-    created: int
-    completed: int
+class AiOut(BaseModel):
+    """Вкладка «Учёт AI-расходов». Период — по дате записи расхода."""
 
-
-class AnalyticsOut(BaseModel):
     date_from: datetime
     date_to: datetime
-    summary: Summary
-    by_status: list[StatusCount]
-    workload: list[WorkloadRow]
+    records: int
+    # Общая доля на правки по всем сервисам (0..1); None — расходов за период нет
+    revision_share: float | None
+    by_service: list[ServiceCredits]
+    by_executor: list[ExecutorCredits]
+    by_task: list[TaskCredits]
+    # Строк по задачам больше лимита — показаны самые затратные
+    by_task_truncated: bool
+
+
+# ---------- учёт времени ----------
+
+
+class TimeTiles(BaseModel):
+    """Средние по задачам, принятым в периоде (секунды)."""
+
+    completed: int
+    avg_work_seconds: int | None
+    avg_revision_seconds: int | None
+    avg_review_wait_seconds: int | None
+    avg_pool_wait_seconds: int | None
+
+
+class CreativeTime(BaseModel):
+    user: UserBrief
+    # Принято задач этого исполнителя за период
+    completed: int
+    work_seconds: int
+    revision_seconds: int
+    # Среднее (работа + правки) на задачу, в которой он работал
+    avg_task_seconds: int | None
+    revisions_per_task: float | None
+
+
+class TaskTime(BaseModel):
+    task_id: int
+    offer: str
+    geo: str
+    user: UserBrief | None
+    completed_at: datetime
+    work_seconds: int
+    revision_seconds: int
+    revision_count: int
+    review_wait_seconds: int
+    pool_wait_seconds: int
+    # Срок по первой сдаче: вовремя / поздно / без дедлайна
+    deadline: Literal["on_time", "late", "none"]
+
+
+class ReviewWaitRow(BaseModel):
+    """Ожидание проверки — за тем, кто фактически принял работу."""
+
+    user: UserBrief | None
+    tasks: int
+    avg_seconds: int
+    max_seconds: int
+
+
+class WaitingNow(BaseModel):
+    """Сейчас ждут проверки — без периода."""
+
+    count: int
+    oldest_task_id: int | None
+    oldest_seconds: int | None
+
+
+class TimeOut(BaseModel):
+    """Вкладка «Учёт времени»."""
+
+    date_from: datetime
+    date_to: datetime
+    tiles: TimeTiles
+    by_creative: list[CreativeTime]
+    by_task: list[TaskTime]
+    by_task_truncated: bool
+    review_wait_by_reviewer: list[ReviewWaitRow]
+    waiting_now: WaitingNow
     overdue: OverdueStats
-    ai_credits: AiCredits
-    timeline: list[DayPoint]

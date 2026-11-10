@@ -1,13 +1,17 @@
+import importlib.util
 from collections import Counter
 from datetime import timedelta
+from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text, update
 
 from app.core import clock
 from app.core.db import SessionFactory
 from app.demo_content import STORIES, demo_image
+from app.models.ai import AiUsage
 from app.models.task import Task, TaskEvent, WorkInterval
 from app.seed import DEMO_PASSWORD, DEMO_USERS, is_empty, seed, wipe
 
@@ -70,23 +74,33 @@ async def test_seed_makes_analytics_non_empty(client: AsyncClient) -> None:
     await _login_head(client)
     now = clock.now()
 
-    async def period(days: int) -> dict[str, Any]:
+    async def period(days: int, tab: str = "overview") -> dict[str, Any]:
         params = {
             "date_from": (now - timedelta(days=days)).isoformat(),
             "date_to": (now + timedelta(days=1)).isoformat(),
         }
-        result: dict[str, Any] = (await client.get("/api/analytics", params=params)).json()
+        resp = await client.get(f"/api/analytics/{tab}", params=params)
+        result: dict[str, Any] = resp.json()
         return result
 
     week, quarter = await period(7), await period(92)
     assert week["summary"]["created"] > 0
     assert week["summary"]["completed"] > 0
     assert quarter["summary"]["completed"] == 8
-    assert quarter["overdue"]["late"] > 0
-    assert quarter["overdue"]["current"] > 0
-    assert quarter["summary"]["avg_work_seconds"] > 3600
-    assert len(quarter["ai_credits"]["by_service"]) >= 6
     assert any(w["active_tasks"] > 0 for w in quarter["workload"])
+
+    # Все три вкладки на демо не пустые: время, ожидание, правки в AI-расходах
+    time, ai = await period(92, "time"), await period(92, "ai")
+    assert time["overdue"]["late"] > 0
+    assert time["overdue"]["current"] > 0
+    assert time["tiles"]["avg_work_seconds"] > 3600
+    assert time["tiles"]["avg_revision_seconds"] > 0
+    assert time["tiles"]["avg_review_wait_seconds"] > 0
+    assert time["review_wait_by_reviewer"]
+    assert time["waiting_now"]["count"] > 0
+    assert len(ai["by_service"]) >= 6
+    assert ai["revision_share"] and ai["revision_share"] > 0
+    assert any(row["revisions"] > 0 for row in ai["by_task"])
 
 
 async def test_wipe_and_reseed() -> None:
@@ -104,3 +118,28 @@ def test_demo_image_is_valid_png() -> None:
     data = demo_image(0)
     assert data.startswith(b"\x89PNG\r\n\x1a\n")
     assert b"IEND" in data[-12:]
+
+
+def _load_migration(filename: str) -> ModuleType:
+    # Каталог alembic/ проекта совпадает по имени с пакетом alembic — грузим файл по пути
+    path = Path(__file__).resolve().parent.parent / "alembic" / "versions" / filename
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def test_ai_usage_round_backfill_matches_live_rounds() -> None:
+    # Миграция раскладывает старые расходы по кругам из истории; сид пишет круги «вживую».
+    # Обнуляем круги, прогоняем SQL миграции — должно получиться то же самое
+    migration = _load_migration("20261110_8c4e1f0a2b37_ai_usage_round.py")
+    await _seed()
+    async with SessionFactory() as session:
+        live = dict((await session.execute(select(AiUsage.id, AiUsage.round))).all())
+        assert any(r > 0 for r in live.values()), "в сиде нет расходов на правках"
+        await session.execute(update(AiUsage).values(round=0))
+        await session.execute(text(migration.BACKFILL_SQL))
+        await session.commit()
+        restored = dict((await session.execute(select(AiUsage.id, AiUsage.round))).all())
+    assert restored == live

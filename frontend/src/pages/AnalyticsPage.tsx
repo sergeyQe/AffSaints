@@ -1,30 +1,30 @@
 import {
   Alert,
+  Box,
+  Center,
   Group,
+  Loader,
   LoadingOverlay,
   SegmentedControl,
   Select,
-  SimpleGrid,
   Stack,
+  Tabs,
   Text,
   TextInput,
   Title,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconSearch } from '@tabler/icons-react';
+import { IconClockHour4, IconRobot, IconSearch, IconUsers } from '@tabler/icons-react';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
-import { useAnalytics } from '../api/analytics';
+import { useAnalyticsTab, type AnalyticsParams, type AnalyticsTab } from '../api/analytics';
 import { useUsers } from '../api/users';
-import { AiCreditsSection } from '../components/analytics/AiCreditsSection';
-import { OverdueSection } from '../components/analytics/OverdueSection';
-import { StatusChart } from '../components/analytics/StatusChart';
-import { SummaryTiles } from '../components/analytics/SummaryTiles';
-import { TimelineChart } from '../components/analytics/TimelineChart';
-import { Section } from '../components/analytics/ui';
-import { WorkloadSection } from '../components/analytics/WorkloadSection';
+import { AiTab } from '../components/analytics/AiTab';
+import { OverviewTab } from '../components/analytics/OverviewTab';
+import { TimeTab } from '../components/analytics/TimeTab';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { errorMessage } from '../lib/notify';
 import {
@@ -35,6 +35,15 @@ import {
   type Period,
   type PeriodPreset,
 } from '../lib/period';
+
+// Подвкладки аналитики; на телефоне — короткие подписи, чтобы все три были видны
+const TABS = [
+  { value: 'overview', label: 'Пользователи и задачи', short: 'Задачи', icon: IconUsers },
+  { value: 'ai', label: 'Учёт AI-расходов', short: 'AI-расходы', icon: IconRobot },
+  { value: 'time', label: 'Учёт времени', short: 'Время', icon: IconClockHour4 },
+] as const;
+
+const isTab = (v: string | null): v is AnalyticsTab => TABS.some((t) => t.value === v);
 
 const PERIOD_OPTIONS = [
   ...Object.entries(PRESET_LABELS).map(([value, label]) => ({ value, label })),
@@ -59,15 +68,31 @@ export function AnalyticsPage() {
       ? rangePeriod(range[0], range[1])
       : presetPeriod(preset === 'custom' ? 'month' : preset);
 
-  const analytics = useAnalytics({
+  // Фильтры общие для всех вкладок
+  const params: AnalyticsParams = {
     date_from: period.from.toISOString(),
     date_to: period.to.toISOString(),
     buyer_id: buyerId ? Number(buyerId) : null,
     creative_id: creativeId ? Number(creativeId) : null,
     offer: debouncedOffer.trim() || undefined,
     tz: browserTimezone(),
-  });
-  const data = analytics.data;
+  };
+  // Открытая вкладка — в адресе (?tab=ai), ссылкой можно поделиться
+  const [search, setSearch] = useSearchParams();
+  const tabParam = search.get('tab');
+  const tab: AnalyticsTab = isTab(tabParam) ? tabParam : 'overview';
+  const setTab = (next: string | null) => {
+    if (!isTab(next)) return;
+    setSearch(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === 'overview') p.delete('tab');
+        else p.set('tab', next);
+        return p;
+      },
+      { replace: true },
+    );
+  };
   const options = (list?: { id: number; full_name: string }[]) =>
     (list ?? []).map((u) => ({ value: String(u.id), label: u.full_name }));
 
@@ -142,35 +167,67 @@ export function AnalyticsPage() {
         />
       </Group>
 
-      {analytics.isError && (
-        <Alert color="red" variant="light">
-          Не удалось загрузить аналитику: {errorMessage(analytics.error)}
-        </Alert>
-      )}
+      {/* Панель рисуется только у открытой вкладки — и запрос уходит только за ней */}
+      <Tabs value={tab} onChange={setTab} keepMounted={false}>
+        {/* Телефон: вкладки на всю ширину, без иконок, короткие подписи; имя вкладки = видимый текст */}
+        <Tabs.List grow={isMobile}>
+          {TABS.map((t) => (
+            <Tabs.Tab
+              key={t.value}
+              value={t.value}
+              leftSection={isMobile ? undefined : <t.icon size={16} />}
+            >
+              {isMobile ? t.short : t.label}
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+        <Tabs.Panel value="overview" pt="md">
+          <TabContent tab="overview" params={params} render={(d) => <OverviewTab data={d} />} />
+        </Tabs.Panel>
+        <Tabs.Panel value="ai" pt="md">
+          <TabContent tab="ai" params={params} render={(d) => <AiTab data={d} />} />
+        </Tabs.Panel>
+        <Tabs.Panel value="time" pt="md">
+          <TabContent tab="time" params={params} render={(d) => <TimeTab data={d} />} />
+        </Tabs.Panel>
+      </Tabs>
+    </Stack>
+  );
+}
 
-      {data && (
-        <Stack pos="relative">
-          <LoadingOverlay visible={analytics.isFetching && analytics.isPlaceholderData} />
-          <SummaryTiles data={data} />
-          <SimpleGrid cols={{ base: 1, lg: 2 }}>
-            <Section title="Динамика" hint="Созданные и завершённые задачи по дням">
-              <TimelineChart data={data} />
-            </Section>
-            <Section title="Задачи по статусам" hint="Созданные за период — по текущему статусу">
-              <StatusChart data={data} />
-            </Section>
-          </SimpleGrid>
-          <Section title="Загрузка креативщиков" hint="Активные задачи — на текущий момент">
-            <WorkloadSection data={data} />
-          </Section>
-          <Section title="Сроки" hint="Дедлайны, попавшие в период">
-            <OverdueSection data={data} />
-          </Section>
-          <Section title="Расходы AI-кредитов" hint="По дате записи расхода">
-            <AiCreditsSection data={data} />
-          </Section>
-        </Stack>
-      )}
+/** Загрузка одной вкладки: ошибка, первичная загрузка и затемнение при смене фильтров. */
+function TabContent<T extends AnalyticsTab>({
+  tab,
+  params,
+  render,
+}: {
+  tab: T;
+  params: AnalyticsParams;
+  render: (data: NonNullable<ReturnType<typeof useAnalyticsTab<T>>['data']>) => ReactNode;
+}) {
+  const query = useAnalyticsTab(tab, params);
+  // Ошибка не прячет уже загруженные данные: сбой фонового обновления — сообщение над ними
+  const error = query.isError && (
+    <Alert color="red" variant="light">
+      Не удалось загрузить аналитику: {errorMessage(query.error)}
+    </Alert>
+  );
+  if (!query.data) {
+    return (
+      error || (
+        <Center py="xl">
+          <Loader />
+        </Center>
+      )
+    );
+  }
+  return (
+    <Stack>
+      {error}
+      <Box pos="relative">
+        <LoadingOverlay visible={query.isFetching && query.isPlaceholderData} />
+        {render(query.data)}
+      </Box>
     </Stack>
   );
 }

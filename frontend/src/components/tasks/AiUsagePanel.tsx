@@ -164,6 +164,16 @@ export function AiUsagePanel({ task }: { task: TaskDetail }) {
                           </Badge>
                         )}
                       </Group>
+                      {/* К какому кругу относится расход: первая версия или правки */}
+                      <Badge
+                        size="xs"
+                        variant="light"
+                        color={u.round > 0 ? 'orange' : 'blue'}
+                        tt="none"
+                        mt={2}
+                      >
+                        {u.round > 0 ? `Правки №${u.round}` : 'Первая версия'}
+                      </Badge>
                     </Table.Td>
                     <Table.Td ta="right">
                       <Text size="sm" fw={500}>

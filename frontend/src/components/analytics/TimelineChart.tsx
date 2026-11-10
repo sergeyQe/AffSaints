@@ -1,11 +1,11 @@
 import { LineChart } from '@mantine/charts';
 import dayjs from 'dayjs';
 
-import type { Analytics } from '../../api/analytics';
+import type { Overview } from '../../api/analytics';
 import { CHART_GRID, SERIES } from '../../lib/chartPalette';
 import { EmptyState } from './ui';
 
-export function TimelineChart({ data }: { data: Analytics }) {
+export function TimelineChart({ data }: { data: Overview }) {
   const points = data.timeline.map((p) => ({ ...p, label: dayjs(p.day).format('D MMM') }));
   if (!points.some((p) => p.created || p.completed))
     return <EmptyState>За период задач нет.</EmptyState>;

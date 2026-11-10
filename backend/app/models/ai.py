@@ -30,6 +30,7 @@ class AiUsage(Base):
     __tablename__ = "ai_usage"
     __table_args__ = (
         CheckConstraint("credits > 0", name="credits_positive"),
+        CheckConstraint("round >= 0", name="round_non_negative"),
         Index("ix_ai_usage_task_id", "task_id"),
         Index("ix_ai_usage_user_id_created_at", "user_id", "created_at"),
         Index("ix_ai_usage_service_id", "service_id"),
@@ -41,6 +42,8 @@ class AiUsage(Base):
     # Креативщик, чьи это расходы (для аналитики по исполнителям)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     credits: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    # Круг правок на момент внесения: 0 — первая версия, 1, 2… — правки
+    round: Mapped[int] = mapped_column(default=0, server_default="0")
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

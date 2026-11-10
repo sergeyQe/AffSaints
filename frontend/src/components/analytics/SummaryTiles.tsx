@@ -1,23 +1,19 @@
 import { SimpleGrid } from '@mantine/core';
 
-import type { Analytics } from '../../api/analytics';
-import { formatDurationOrDash } from '../../lib/format';
+import type { Overview } from '../../api/analytics';
+import { formatDecimalOrDash } from '../../lib/format';
 import { StatTile } from './ui';
 
-export function SummaryTiles({ data }: { data: Analytics }) {
+export function SummaryTiles({ data }: { data: Overview }) {
   const s = data.summary;
   return (
-    <SimpleGrid cols={{ base: 2, sm: 3, lg: 6 }}>
+    // Среднее время — на вкладке «Учёт времени»
+    <SimpleGrid cols={{ base: 2, sm: 3, lg: 5 }}>
       <StatTile label="Создано" value={String(s.created)} hint="за период" />
       <StatTile label="Завершено" value={String(s.completed)} hint="принято за период" />
       <StatTile
-        label="Среднее время"
-        value={formatDurationOrDash(s.avg_work_seconds)}
-        hint="чистая работа креативщика"
-      />
-      <StatTile
         label="Правок на задачу"
-        value={s.revisions_per_task === null ? '—' : s.revisions_per_task.toFixed(1)}
+        value={formatDecimalOrDash(s.revisions_per_task)}
         hint="в завершённых"
       />
       <StatTile label="В работе сейчас" value={String(s.active_now)} hint="все активные задачи" />

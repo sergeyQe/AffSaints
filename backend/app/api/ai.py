@@ -38,6 +38,7 @@ def usage_out(u: AiUsage) -> AiUsageOut:
         service=service_out(u.service),
         user=UserBrief(id=u.user.id, full_name=u.user.full_name),
         credits=float(u.credits),
+        round=u.round,
         created_at=u.created_at,
         updated_at=u.updated_at,
     )

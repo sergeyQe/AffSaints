@@ -1,11 +1,11 @@
 import { BarChart } from '@mantine/charts';
 
-import type { Analytics } from '../../api/analytics';
+import type { Overview } from '../../api/analytics';
 import { SERIES } from '../../lib/chartPalette';
 import { STATUS_LABELS } from '../../lib/tasks';
 import { EmptyState } from './ui';
 
-export function StatusChart({ data }: { data: Analytics }) {
+export function StatusChart({ data }: { data: Overview }) {
   const rows = data.by_status
     .filter((s) => s.count > 0)
     .map((s) => ({ status: STATUS_LABELS[s.status], count: s.count }));

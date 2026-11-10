@@ -4,6 +4,11 @@ import type { DrawerTab } from '../components/tasks/TaskDrawer';
 
 const TABS: DrawerTab[] = ['details', 'files', 'ai', 'history'];
 
+/** Ссылка на карточку задачи на доске — в том же формате, что читает useTaskDrawer. */
+export function taskUrl(id: number, tab: DrawerTab = 'details'): string {
+  return tab === 'details' ? `/?task=${id}` : `/?task=${id}&tab=${tab}`;
+}
+
 /** Открытая задача и вкладка живут в URL (?task=12&tab=files) — ссылкой можно поделиться. */
 export function useTaskDrawer() {
   const [params, setParams] = useSearchParams();
