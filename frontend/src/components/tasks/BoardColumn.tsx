@@ -43,10 +43,35 @@ interface Props {
   /** Колонка — допустимая цель для перетаскиваемой сейчас карточки. */
   canDrop: boolean;
   isDragActive: boolean;
+  /** Перетаскиваемая карточка взята из этой колонки — место под неё не показываем. */
+  isDragSource?: boolean;
   onOpen: (id: number) => void;
 }
 
-export function BoardColumn({ status, tasks, canDrop, isDragActive, onOpen }: Props) {
+/** Место под карточку внизу колонки: зелёное — можно перенести, красное — нельзя. */
+function DropSlot({ canDrop, isOver }: { canDrop: boolean; isOver: boolean }) {
+  const label = !canDrop ? 'Сюда нельзя' : isOver ? 'Отпустите, чтобы перенести' : 'Перенести сюда';
+  return (
+    <div
+      className={classes.slot}
+      data-allowed={canDrop || undefined}
+      data-forbidden={!canDrop || undefined}
+      data-over={(isOver && canDrop) || undefined}
+      aria-hidden
+    >
+      {label}
+    </div>
+  );
+}
+
+export function BoardColumn({
+  status,
+  tasks,
+  canDrop,
+  isDragActive,
+  isDragSource = false,
+  onOpen,
+}: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: status, disabled: !canDrop });
   const creatives = tasks.reduce((sum, t) => sum + t.quantity, 0);
 
@@ -82,13 +107,15 @@ export function BoardColumn({ status, tasks, canDrop, isDragActive, onOpen }: Pr
           {tasks.map((t) => (
             <DraggableCard key={t.id} task={t} onOpen={onOpen} />
           ))}
-          {tasks.length === 0 && (
+          {tasks.length === 0 && !isDragActive && (
             <Text size="xs" c="dimmed" ta="center" py="md">
               Пусто
             </Text>
           )}
         </Stack>
       </ScrollArea.Autosize>
+      {/* Во время переноса — место под карточку под списком, вне прокрутки: видно всегда */}
+      {isDragActive && !isDragSource && <DropSlot canDrop={canDrop} isOver={isOver} />}
     </div>
   );
 }

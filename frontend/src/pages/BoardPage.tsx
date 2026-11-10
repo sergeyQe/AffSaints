@@ -67,7 +67,8 @@ export function BoardPage() {
 
       <DndContext {...dndProps}>
         <Box style={{ overflowX: 'auto' }} pb="xs">
-          <Group align="flex-start" wrap="nowrap" gap="sm" miw={5 * 222}>
+          {/* Колонки одной высоты: бросить карточку можно в любом месте колонки, а не только на карточки */}
+          <Group align="stretch" wrap="nowrap" gap="sm" miw={5 * 222}>
             {BOARD_COLUMNS.map((status) => (
               <BoardColumn
                 key={status}
@@ -75,6 +76,7 @@ export function BoardPage() {
                 tasks={groups[status]}
                 canDrop={targets.includes(status)}
                 isDragActive={dragged !== null}
+                isDragSource={dragged?.status === status}
                 onOpen={(id) => drawer.open(id)}
               />
             ))}

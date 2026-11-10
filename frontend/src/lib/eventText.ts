@@ -1,5 +1,5 @@
 import type { CreativeType, Priority, TaskEvent } from '../api/tasks';
-import { CREATIVE_TYPE_LABELS, formatDateTime, PRIORITY_LABELS } from './tasks';
+import { CREATIVE_TYPE_LABELS, formatDateTime, PRIORITY_LABELS, STATUS_LABELS } from './tasks';
 
 const FIELD_NAMES: Record<string, string> = {
   offer: 'Оффер',
@@ -48,7 +48,7 @@ export interface EventText {
 }
 
 type Payload = TaskEvent['payload'];
-type Formatter = (p: Payload) => EventText;
+type Formatter = (p: Payload, e: TaskEvent) => EventText;
 
 const kindName = (p: Payload) => (p.kind === 'result' ? 'результат' : 'референс');
 const changes = (p: Payload) => describeChanges((p.changes as Change[]) ?? []);
@@ -59,8 +59,11 @@ const text = (title: string, color: string, details: string[] = []): EventText =
 });
 
 // Перенос руководителем: смена исполнителя, круг правок и комментарий — если были
-const movedDetails = (p: Payload) => {
+const movedDetails = (p: Payload, e: TaskEvent) => {
   const details: string[] = [];
+  // Откуда и куда перенесли — первой строкой
+  if (e.from_status && e.to_status)
+    details.push(`${STATUS_LABELS[e.from_status]} → ${STATUS_LABELS[e.to_status]}`);
   if (p.from && p.assignee) details.push(`Исполнитель: ${person(p.from)} → ${person(p.assignee)}`);
   else if (p.assignee) details.push(`Исполнитель: ${person(p.assignee)}`);
   else if (p.from) details.push(`Снят исполнитель: ${person(p.from)}`);
@@ -91,7 +94,7 @@ const FORMATTERS: Record<string, Formatter> = {
   reassigned: (p) => text('Исполнитель заменён', 'grape', [`${person(p.from)} → ${person(p.to)}`]),
   unassigned: (p) =>
     text('Исполнитель снят, задача вернулась в пул', 'grape', [`Был: ${person(p.from)}`]),
-  moved: (p) => text('Руководитель перенёс задачу', 'grape', movedDetails(p)),
+  moved: (p, e) => text('Руководитель перенёс задачу', 'grape', movedDetails(p, e)),
   attachment_added: (p) => text(`Добавлен ${kindName(p)}`, 'cyan', [str(p.name)]),
   attachment_removed: (p) => text(`Удалён ${kindName(p)}`, 'gray', [str(p.name)]),
   ai_usage_added: (p) =>
@@ -107,5 +110,5 @@ const FORMATTERS: Record<string, Formatter> = {
 export function describeEvent(event: TaskEvent): EventText {
   const format = FORMATTERS[event.type];
   // Неизвестный тип (например, добавили на backend раньше фронта) не ломает историю
-  return format ? format(event.payload) : text(event.type, 'gray');
+  return format ? format(event.payload, event) : text(event.type, 'gray');
 }

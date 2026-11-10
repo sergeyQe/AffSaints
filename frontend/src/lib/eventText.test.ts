@@ -68,9 +68,10 @@ describe('describeEvent', () => {
       round: 2,
       comment: 'Другой хук',
     };
-    expect(describeEvent(event('moved', payload))).toMatchObject({
+    const moved = { ...event('moved', payload), from_status: 'in_progress', to_status: 'revision' };
+    expect(describeEvent(moved as TaskEvent)).toMatchObject({
       title: 'Руководитель перенёс задачу',
-      details: ['Исполнитель: Иван → Мария', 'Круг правок 2', '«Другой хук»'],
+      details: ['В работе → Правки', 'Исполнитель: Иван → Мария', 'Круг правок 2', '«Другой хук»'],
     });
     expect(describeEvent(event('moved', { from: { full_name: 'Иван' } })).details).toEqual([
       'Снят исполнитель: Иван',
