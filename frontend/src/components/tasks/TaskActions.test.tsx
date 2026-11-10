@@ -118,7 +118,7 @@ describe('TaskActions', () => {
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({ assignee_id: 4 });
   });
 
-  it('сдача без результата ведёт на вкладку файлов', async () => {
+  it('сдача без результата: окно с выключенной галочкой, «Приложить материал» ведёт к файлам', async () => {
     mockFetch({
       'POST /api/tasks/7/submit': jsonError(400, 'result_required', 'Прикрепите результат'),
     });
@@ -126,7 +126,34 @@ describe('TaskActions', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Сдать на проверку' }));
 
-    await waitFor(() => expect(onResultRequired).toHaveBeenCalled());
-    expect(await screen.findByText('Прикрепите результат')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Материал не приложен' });
+    // Галочка по умолчанию снята — без неё сдать нельзя
+    expect(within(dialog).getByRole('checkbox', { name: 'Сдать без материала' })).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: 'Сдать' })).toBeDisabled();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Приложить материал' }));
+    expect(onResultRequired).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Материал не приложен' })).toBeNull(),
+    );
+  });
+
+  it('сдача без материала после подтверждения галочкой', async () => {
+    const fetch = mockFetch({
+      'POST /api/tasks/7/submit': (init?: RequestInit) =>
+        init?.body
+          ? makeTask({ id: 7, status: 'review' })
+          : jsonError(400, 'result_required', 'Прикрепите результат'),
+    });
+    const { onResultRequired } = renderActions(['submit'], 'in_progress');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Сдать на проверку' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Материал не приложен' });
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Сдать без материала' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Сдать' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({ without_result: true });
+    expect(onResultRequired).not.toHaveBeenCalled();
   });
 });

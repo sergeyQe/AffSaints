@@ -69,6 +69,12 @@ class ReassignIn(BaseModel):
     assignee_id: int
 
 
+class SubmitIn(BaseModel):
+    """Сдача: без результата — только с явным подтверждением исполнителя."""
+
+    without_result: bool = False
+
+
 class MoveIn(BaseModel):
     """Перенос карточки руководителем: исполнитель — если задача уходит из «Новых»,
     комментарий — для правок (необязателен)."""

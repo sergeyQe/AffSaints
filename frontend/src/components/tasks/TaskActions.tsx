@@ -15,6 +15,7 @@ import type { TaskDetail } from '../../api/tasks';
 import { useRunTransition } from '../../hooks/useRunTransition';
 import { TextPromptModal } from '../common/TextPromptModal';
 import { ReassignModal } from './ReassignModal';
+import { SubmitWithoutResultModal } from './SubmitWithoutResultModal';
 
 /** Какое окно ввода открыто: комментарий правок, причина отмены, выбор исполнителя. */
 export type PromptKind = 'revision' | 'reopen' | 'cancel' | 'assign' | 'reassign' | null;
@@ -27,7 +28,7 @@ interface Props {
 
 /** Кнопки действий — строго по списку task.actions, который прислал backend. */
 export function TaskActions({ task, onEdit, onResultRequired }: Props) {
-  const { run, isPending } = useRunTransition(onResultRequired);
+  const { run, isPending, noResult } = useRunTransition(onResultRequired);
   const [prompt, setPrompt] = useState<PromptKind>(null);
   const can = (a: TaskDetail['actions'][number]) => task.actions.includes(a);
   const close = () => setPrompt(null);
@@ -169,6 +170,14 @@ export function TaskActions({ task, onEdit, onResultRequired }: Props) {
           loading={isPending}
           onClose={close}
           onSubmit={(assignee_id) => run({ id: task.id, action: prompt, assignee_id }, close)}
+        />
+      )}
+      {noResult.taskId !== null && (
+        <SubmitWithoutResultModal
+          loading={noResult.loading}
+          onAttach={noResult.attach}
+          onConfirm={noResult.confirm}
+          onClose={noResult.cancel}
         />
       )}
     </>

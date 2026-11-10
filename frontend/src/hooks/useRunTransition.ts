@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { ApiError } from '../api/client';
 import { useTransition, type TransitionVars } from '../api/tasks';
 import { notifyError, notifySuccess } from '../lib/notify';
@@ -21,16 +23,35 @@ const SUCCESS_TEXT: Record<TransitionVars['action'], string> = {
  * переносах ошибка каждой карточки не теряется.
  */
 export function useRunTransition(onResultRequired?: (taskId: number) => void) {
+  // Задача, которую пытались сдать без результата: окно «приложить или сдать без материала»
+  const [noResultId, setNoResultId] = useState<number | null>(null);
   const transition = useTransition({
     onSuccess: (_, vars) => notifySuccess(SUCCESS_TEXT[vars.action]),
     onError: (e, vars) => {
-      // Без результата сдать нельзя — ведём пользователя к файлам именно этой задачи
-      if (e instanceof ApiError && e.code === 'result_required') onResultRequired?.(vars.id);
+      // Без результата — не ошибка, а вопрос исполнителю именно по этой задаче
+      if (e instanceof ApiError && e.code === 'result_required') {
+        setNoResultId(vars.id);
+        return;
+      }
       notifyError(e, 'Действие не выполнено');
     },
   });
   // onDone — только закрыть модалку; модалка одна, поэтому «последний вызов» здесь безопасен
   const run = (vars: TransitionVars, onDone?: () => void) =>
     transition.mutate(vars, { onSuccess: () => onDone?.() });
-  return { run, isPending: transition.isPending };
+
+  // Окно сдачи без материала: приложить (к файлам задачи) или подтвердить сдачу без него
+  const noResult = {
+    taskId: noResultId,
+    loading: transition.isPending,
+    attach: () => {
+      if (noResultId !== null) onResultRequired?.(noResultId);
+      setNoResultId(null);
+    },
+    confirm: () =>
+      noResultId !== null &&
+      run({ id: noResultId, action: 'submit', without_result: true }, () => setNoResultId(null)),
+    cancel: () => setNoResultId(null),
+  };
+  return { run, isPending: transition.isPending, noResult };
 }

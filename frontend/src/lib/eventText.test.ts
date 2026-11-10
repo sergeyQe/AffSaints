@@ -78,6 +78,13 @@ describe('describeEvent', () => {
     ]);
   });
 
+  it('сдача без приложенного материала', () => {
+    expect(describeEvent(event('submitted', { without_result: true })).details).toEqual([
+      'Без приложенного материала',
+    ]);
+    expect(describeEvent(event('resubmitted')).details).toEqual([]);
+  });
+
   it('вложение-результат', () => {
     expect(
       describeEvent(event('attachment_added', { kind: 'result', name: 'v2.mp4' })),

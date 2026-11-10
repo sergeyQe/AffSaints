@@ -30,7 +30,7 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
   const [revisionFor, setRevisionFor] = useState<Pending | null>(null);
   // Назначению нужен исполнитель — перенос руководителем из «Новых» открывает выбор креативщика
   const [assignFor, setAssignFor] = useState<Pending | null>(null);
-  const { run, isPending } = useRunTransition(onResultRequired);
+  const { run, isPending, noResult } = useRunTransition(onResultRequired);
 
   const sensors = useSensors(
     // Мышь: небольшой порог — простой клик открывает карточку, а не начинает перетаскивание
@@ -94,6 +94,8 @@ export function useBoardDnd(onResultRequired: (taskId: number) => void) {
     dragged,
     targets: dragged ? allowedTargets(dragged) : [],
     dndProps: { sensors, onDragStart, onDragEnd, onDragCancel: () => setDragged(null) },
+    // Перенос на проверку без результата — окно «приложить или сдать без материала»
+    noResult,
     revision: {
       task: revisionFor?.task ?? null,
       isPending,

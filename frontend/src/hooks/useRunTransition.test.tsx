@@ -50,7 +50,10 @@ describe('useRunTransition', () => {
       hook.result.current.run({ id: 2, action: 'submit' });
     });
 
-    await waitFor(() => expect(onResultRequired).toHaveBeenCalledWith(1));
+    // Окно «сдать без материала» открывается именно для задачи без результата
+    await waitFor(() => expect(hook.result.current.noResult.taskId).toBe(1));
+    act(() => hook.result.current.noResult.attach());
+    expect(onResultRequired).toHaveBeenCalledWith(1);
     expect(onResultRequired).toHaveBeenCalledTimes(1);
   });
 });

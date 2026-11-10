@@ -14,6 +14,7 @@ from app.schemas.task import (
     MoveIn,
     ReasonIn,
     ReassignIn,
+    SubmitIn,
     TaskCreate,
     TaskDetail,
     TaskFilters,
@@ -135,8 +136,12 @@ async def assign(task_id: int, body: ReassignIn, session: Session, user: Current
 
 
 @router.post("/{task_id}/submit")
-async def submit(task_id: int, session: Session, user: CurrentUser) -> TaskDetail:
-    return await to_detail(session, await service.submit(session, task_id, user), user)
+async def submit(
+    task_id: int, session: Session, user: CurrentUser, body: SubmitIn | None = None
+) -> TaskDetail:
+    without_result = body.without_result if body else False
+    task = await service.submit(session, task_id, user, without_result)
+    return await to_detail(session, task, user)
 
 
 @router.post("/{task_id}/accept")

@@ -167,6 +167,8 @@ export function useUpdateTask() {
 
 export type TransitionVars =
   | { id: number; action: 'take' | 'submit' | 'accept' | 'unassign' }
+  // Сдача без материала — только с явным подтверждением исполнителя
+  | { id: number; action: 'submit'; without_result: true }
   | { id: number; action: 'request-revision' | 'reopen'; comment: string }
   | { id: number; action: 'cancel'; reason: string }
   | { id: number; action: 'assign' | 'reassign'; assignee_id: number }

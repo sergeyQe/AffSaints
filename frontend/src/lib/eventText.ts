@@ -58,6 +58,9 @@ const text = (title: string, color: string, details: string[] = []): EventText =
   color,
 });
 
+// Сдача, подтверждённая исполнителем без приложенного результата
+const withoutResult = (p: Payload) => (p.without_result ? ['Без приложенного материала'] : []);
+
 // Перенос руководителем: смена исполнителя, круг правок и комментарий — если были
 const movedDetails = (p: Payload, e: TaskEvent) => {
   const details: string[] = [];
@@ -81,8 +84,8 @@ const FORMATTERS: Record<string, Formatter> = {
   updated: (p) => text('ТЗ изменено', 'violet', changes(p)),
   taken: () => text('Взята в работу', 'blue'),
   assigned: (p) => text('Назначен исполнитель', 'blue', [`Исполнитель: ${person(p.to)}`]),
-  submitted: () => text('Сдана на проверку', 'yellow'),
-  resubmitted: () => text('Исправления сданы на проверку', 'yellow'),
+  submitted: (p) => text('Сдана на проверку', 'yellow', withoutResult(p)),
+  resubmitted: (p) => text('Исправления сданы на проверку', 'yellow', withoutResult(p)),
   accepted: () => text('Работа принята', 'teal'),
   revision_requested: (p) =>
     text(`Отправлена на правки (круг ${String(p.round ?? '')})`, 'orange', [`«${str(p.comment)}»`]),

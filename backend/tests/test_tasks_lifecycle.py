@@ -660,3 +660,39 @@ async def test_head_cannot_move_own_work_to_review_or_done(as_user: AsUser) -> N
     assert (await move(head_creative, tid, "review")).status_code == 403
     # Остальные переносы своей задачи доступны
     assert ok(await move(head_creative, tid, "revision"))["status"] == "revision"
+
+
+async def test_submit_without_result_needs_explicit_confirmation(
+    as_user: AsUser, fake_clock: FakeClock
+) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    creative = as_user(await create_user(Role.CREATIVE))
+    tid = (await create_task(buyer))["id"]
+    ok(await act(creative, tid, "take"))
+    fake_clock.advance(hours=1)
+
+    # Без подтверждения — как раньше, нужен результат
+    for body in ({}, {"without_result": False}):
+        resp = await act(creative, tid, "submit", **body)
+        assert resp.status_code == 400
+        assert resp.json()["error"]["code"] == "result_required"
+
+    # С подтверждением — сдано, в истории отмечено «без материала», время засчитано
+    t = ok(await act(creative, tid, "submit", without_result=True))
+    assert t["status"] == "review"
+    assert t["work_seconds"] == 60 * 60
+    submitted = ok(await creative.get(f"/api/tasks/{tid}/events"))[-1]
+    assert submitted["type"] == "submitted"
+    assert submitted["payload"] == {"without_result": True}
+
+    # Исправленное после правок — тоже можно без материала
+    ok(await act(buyer, tid, "request-revision", comment="Ещё вариант"))
+    resubmitted = ok(await act(creative, tid, "submit", without_result=True))
+    assert resubmitted["status"] == "review"
+
+    # С результатом флаг не пишется в историю
+    ok(await act(buyer, tid, "request-revision", comment="И ещё"))
+    ok(await submit_work(creative, tid))
+    last = ok(await creative.get(f"/api/tasks/{tid}/events"))[-1]
+    assert last["type"] == "resubmitted"
+    assert last["payload"] == {}

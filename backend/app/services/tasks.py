@@ -186,13 +186,18 @@ async def assign(session: AsyncSession, task_id: int, user: User, assignee_id: i
     return task
 
 
-async def submit(session: AsyncSession, task_id: int, user: User) -> Task:
+async def submit(
+    session: AsyncSession, task_id: int, user: User, without_result: bool = False
+) -> Task:
     task = await lock_task(session, task_id)
     ensure_allowed(Action.SUBMIT, task, user)
 
-    # Сдать можно только с результатом текущего круга (после правок — с новым)
-    if not await _has_result_for_current_round(session, task):
+    # Сдаётся результат текущего круга (после правок — новый); без него — только если
+    # исполнитель явно подтвердил сдачу без материала
+    has_result = await _has_result_for_current_round(session, task)
+    if not has_result and not without_result:
         raise AppError("result_required", "Прикрепите результат работы перед сдачей")
+    payload: dict[str, Any] = {} if has_result else {"without_result": True}
 
     now = clock.now()
     await close_interval(session, task, now)
@@ -206,6 +211,7 @@ async def submit(session: AsyncSession, task_id: int, user: User) -> Task:
         EventType.RESUBMITTED if is_resubmit else EventType.SUBMITTED,
         from_status=previous,
         to_status=task.status,
+        **payload,
     )
     await session.commit()
     return task

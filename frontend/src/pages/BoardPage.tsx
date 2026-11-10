@@ -10,6 +10,7 @@ import { BoardFilters } from '../components/tasks/BoardFilters';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TextPromptModal } from '../components/common/TextPromptModal';
 import { ReassignModal } from '../components/tasks/ReassignModal';
+import { SubmitWithoutResultModal } from '../components/tasks/SubmitWithoutResultModal';
 import { TaskDrawer } from '../components/tasks/TaskDrawer';
 import { TaskFormModal } from '../components/tasks/TaskFormModal';
 import { useBoardDnd } from '../hooks/useBoardDnd';
@@ -27,7 +28,7 @@ export function BoardPage() {
   // undefined — форма закрыта, null — новая задача, TaskDetail — редактирование
   const [form, setForm] = useState<TaskDetail | null | undefined>(undefined);
   // Сдать не дали без результата — открываем файлы именно этой задачи
-  const { dragged, targets, dndProps, revision, assign } = useBoardDnd((taskId) =>
+  const { dragged, targets, dndProps, revision, assign, noResult } = useBoardDnd((taskId) =>
     drawer.open(taskId, 'files'),
   );
 
@@ -133,6 +134,15 @@ export function BoardPage() {
           loading={assign.isPending}
           onClose={assign.cancel}
           onSubmit={assign.submit}
+        />
+      )}
+
+      {noResult.taskId !== null && (
+        <SubmitWithoutResultModal
+          loading={noResult.loading}
+          onAttach={noResult.attach}
+          onConfirm={noResult.confirm}
+          onClose={noResult.cancel}
         />
       )}
     </Stack>
