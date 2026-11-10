@@ -1,12 +1,12 @@
 # Развёртывание на VPS
 
-Схема: `proxy` (nginx, 80/443, Let's Encrypt) → `frontend` (nginx со статикой, проксирует `/api`) → `backend` (FastAPI) → `db` (PostgreSQL). Наружу открыты только 80 и 443.
+Схема: `proxy` (nginx, 80/443, Let's Encrypt) → `frontend` (nginx со статикой, проксирует `/api`) → `backend` (FastAPI) → `db` (PostgreSQL). Наружу открыты только 80 и HTTPS-порт: 443 по умолчанию или другой, если задан `PUBLIC_HTTPS_PORT` (демо работает на 8443).
 
 ## Что нужно заранее
 
 - VPS с Ubuntu 22.04+ (1 vCPU, 1–2 ГБ RAM достаточно), Docker и плагин Compose v2.24+.
 - Домен или поддомен с A-записью на IP сервера (например, `creative.example.com`).
-- Открытые порты 80 и 443.
+- Открытые порты 80 и 443 (или порт из `PUBLIC_HTTPS_PORT`, если 443 занят).
 
 ### Без своего домена
 
