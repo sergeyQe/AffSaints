@@ -12,7 +12,7 @@ const png = (name: string) =>
 async function fillBrief() {
   await userEvent.type(screen.getByLabelText(/Оффер/), 'Pin-Up');
   await userEvent.type(screen.getByLabelText(/GEO/), 'KZ');
-  await userEvent.click(screen.getByRole('button', { name: '+3 дня' }));
+  await userEvent.click(screen.getByRole('button', { name: '+1 день' }));
 }
 
 const calls = (fetch: ReturnType<typeof mockFetch>, suffix: string) =>

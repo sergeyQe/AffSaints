@@ -27,18 +27,20 @@ import {
   diffBrief,
   initialValues,
   needsNoDeadlineConfirm,
-  quickDeadline,
+  shiftDeadline,
   toBrief,
   type TaskFormValues,
 } from '../../lib/taskForm';
 import { CREATIVE_TYPE_LABELS, PRIORITY_LABELS, toOptions } from '../../lib/tasks';
 import { ReferencesInput, type ReferencesValue } from './ReferencesInput';
 
-const QUICK_DEADLINES = [
-  { label: '+1 день', days: 1 },
-  { label: '+3 дня', days: 3 },
-  { label: '+1 неделя', days: 7 },
-];
+// Кнопки сдвига дедлайна: каждое нажатие меняет текущее значение
+const DEADLINE_STEPS = [
+  { label: '−1 день', amount: -1, unit: 'day' },
+  { label: '+1 день', amount: 1, unit: 'day' },
+  { label: '−1 час', amount: -1, unit: 'hour' },
+  { label: '+1 час', amount: 1, unit: 'hour' },
+] as const;
 
 interface Props {
   /** null — создание новой задачи. */
@@ -182,16 +184,21 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
                 {...form.getInputProps('deadline')}
               />
               <Group gap="xs">
-                {QUICK_DEADLINES.map((q) => (
-                  <Button
-                    key={q.label}
-                    size="xs"
-                    variant="light"
-                    onClick={() => form.setFieldValue('deadline', quickDeadline(q.days))}
-                  >
-                    {q.label}
-                  </Button>
-                ))}
+                {DEADLINE_STEPS.map((s) => {
+                  // Недоступный сдвиг (в прошлое или «минус» от пустого) — кнопка неактивна
+                  const next = shiftDeadline(form.values.deadline, s.amount, s.unit);
+                  return (
+                    <Button
+                      key={s.label}
+                      size="xs"
+                      variant="light"
+                      disabled={next === null}
+                      onClick={() => next && form.setFieldValue('deadline', next)}
+                    >
+                      {s.label}
+                    </Button>
+                  );
+                })}
               </Group>
             </Stack>
 

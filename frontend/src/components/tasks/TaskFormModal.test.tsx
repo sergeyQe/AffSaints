@@ -62,13 +62,41 @@ describe('TaskFormModal — создание', () => {
     renderWithProviders(<TaskFormModal task={null} onClose={() => {}} />);
     await fillRequired();
 
-    await userEvent.click(screen.getByRole('button', { name: '+3 дня' }));
+    await userEvent.click(screen.getByRole('button', { name: '+1 день' }));
     await userEvent.click(screen.getByRole('button', { name: 'Создать задачу' }));
 
     await waitFor(() => expect(posted(fetch, 'POST')).toHaveLength(1));
     expect(screen.queryByText('Дедлайн не указан')).not.toBeInTheDocument();
     const body = JSON.parse(String(posted(fetch, 'POST')[0]?.[1]?.body));
     expect(new Date(body.deadline).getTime()).toBeGreaterThan(Date.now());
+  });
+});
+
+describe('TaskFormModal — кнопки дедлайна', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('±1 день и ±1 час меняют текущее значение, «минус» без дедлайна неактивен', async () => {
+    mockFetch({});
+    renderWithProviders(<TaskFormModal task={null} onClose={() => {}} />);
+    const deadline = () => screen.getByRole('button', { name: /Дедлайн/ }).textContent ?? '';
+    const btn = (name: string) => screen.getByRole('button', { name });
+
+    expect(btn('−1 день')).toBeDisabled();
+    expect(btn('−1 час')).toBeDisabled();
+
+    await userEvent.click(btn('+1 день'));
+    await userEvent.click(btn('+1 день'));
+    const twoDays = deadline();
+    await userEvent.click(btn('+1 час'));
+    const plusHour = deadline();
+    expect(plusHour).not.toBe(twoDays);
+    await userEvent.click(btn('−1 час'));
+    expect(deadline()).toBe(twoDays);
+    await userEvent.click(btn('−1 день'));
+    expect(deadline()).not.toBe(twoDays);
+    // Остался день от начала текущего часа — ещё «минус день» ушёл бы в прошлое
+    expect(btn('−1 день')).toBeDisabled();
+    expect(btn('−1 час')).toBeEnabled();
   });
 });
 

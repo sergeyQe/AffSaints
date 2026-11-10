@@ -16,7 +16,7 @@ test('полный цикл задачи от ТЗ до аналитики', asy
   await form.getByLabel('Оффер').fill(offer);
   await form.getByLabel('GEO').fill('BR');
   await form.getByLabel('Количество').fill('3');
-  await form.getByRole('button', { name: '+3 дня' }).click();
+  await form.getByRole('button', { name: '+1 день' }).click();
   await form.getByLabel('Описание').fill('Вертикаль 15 секунд, сквозной тест');
   // Референс — прямо в форме ТЗ, как требует задание
   await form.getByLabel('Ссылка на референс').fill('https://www.tiktok.com/@ref/video/1');
