@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { makeTask } from '../../test/fixtures';
-import { mockFetch, renderWithProviders } from '../../test/utils';
+import { ME_KEY } from '../../api/auth';
+import { createTestQueryClient, mockFetch, renderWithProviders } from '../../test/utils';
 import { TaskFormModal } from './TaskFormModal';
 
 const posted = (fetch: ReturnType<typeof mockFetch>, method: string) =>
@@ -114,6 +115,80 @@ describe('TaskFormModal — кнопки дедлайна', () => {
     // Остался день от начала текущего часа — ещё «минус день» ушёл бы в прошлое
     expect(btn('−1 день')).toBeDisabled();
     expect(btn('−1 час')).toBeEnabled();
+  });
+});
+
+describe('TaskFormModal — черновик', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  // Форма знает текущего пользователя — черновик у каждого свой
+  const renderAs = (userId: number, onClose = () => {}) => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(ME_KEY, {
+      id: userId,
+      login: `u${userId}`,
+      full_name: 'Тест',
+      roles: ['buyer'],
+      is_active: true,
+    });
+    return renderWithProviders(<TaskFormModal task={null} onClose={onClose} />, { queryClient });
+  };
+
+  it('прерванное ТЗ восстанавливается при следующем «Новое ТЗ»', async () => {
+    mockFetch({});
+    const first = renderAs(1);
+    await fillRequired();
+    expect(screen.queryByText(/Восстановлен черновик/)).toBeNull();
+    first.unmount();
+
+    renderAs(1);
+    expect(screen.getByText(/Восстановлен черновик/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Оффер/)).toHaveValue('Pin-Up');
+    expect(screen.getByLabelText(/GEO/)).toHaveValue('KZ');
+  });
+
+  it('у другого пользователя черновика нет', async () => {
+    mockFetch({});
+    const first = renderAs(1);
+    await fillRequired();
+    first.unmount();
+
+    renderAs(2);
+    expect(screen.queryByText(/Восстановлен черновик/)).toBeNull();
+    expect(screen.getByLabelText(/Оффер/)).toHaveValue('');
+  });
+
+  it('«Сбросить черновик» очищает форму и удаляет черновик', async () => {
+    mockFetch({});
+    const first = renderAs(1);
+    await fillRequired();
+    first.unmount();
+
+    const second = renderAs(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Сбросить черновик' }));
+    expect(screen.getByLabelText(/Оффер/)).toHaveValue('');
+    expect(screen.queryByText(/Восстановлен черновик/)).toBeNull();
+    second.unmount();
+
+    renderAs(1);
+    expect(screen.queryByText(/Восстановлен черновик/)).toBeNull();
+  });
+
+  it('после создания задачи черновик удаляется', async () => {
+    const fetch = mockFetch({ 'POST /api/tasks': makeTask() });
+    const first = renderAs(1);
+    await fillRequired();
+    await userEvent.click(screen.getByRole('button', { name: '+1 день' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Создать задачу' }));
+    await waitFor(() => expect(posted(fetch, 'POST')).toHaveLength(1));
+    await waitFor(() => expect(localStorage.getItem('affsaints:task-draft:1')).toBeNull());
+    first.unmount();
+
+    renderAs(1);
+    expect(screen.queryByText(/Восстановлен черновик/)).toBeNull();
   });
 });
 

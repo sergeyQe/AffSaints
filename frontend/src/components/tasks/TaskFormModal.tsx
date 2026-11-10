@@ -15,11 +15,13 @@ import {
 } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
-import { IconAlertTriangle } from '@tabler/icons-react';
+import { IconAlertTriangle, IconRestore } from '@tabler/icons-react';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { uploadReferences } from '../../api/attachments';
+import { useMe } from '../../api/auth';
+import { clearDraft, loadDraft, saveDraft } from '../../lib/taskDraft';
 import { useCreateTask, useUpdateTask, type TaskBrief, type TaskDetail } from '../../api/tasks';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { notifyError, notifySuccess } from '../../lib/notify';
@@ -62,12 +64,20 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
   const create = useCreateTask();
   const update = useUpdateTask();
   const [confirmNoDeadline, setConfirmNoDeadline] = useState<TaskBrief | null>(null);
+  // Черновик «Новое ТЗ» этого пользователя (30 минут): прерванная постановка задачи не теряется
+  const userId = useMe().data?.id;
+  const [draft, setDraft] = useState(() =>
+    isNew && userId !== undefined ? loadDraft(userId) : null,
+  );
   // Референсы из формы создания — прикладываются сразу после создания задачи
-  const [references, setReferences] = useState<ReferencesValue>({ links: [], files: [] });
+  const [references, setReferences] = useState<ReferencesValue>({
+    links: draft?.links ?? [],
+    files: [],
+  });
   const [uploading, setUploading] = useState(false);
 
   const form = useForm<TaskFormValues>({
-    initialValues: initialValues(task),
+    initialValues: draft?.values ?? initialValues(task),
     validate: {
       offer: (v) => (v.trim() ? null : 'Укажите оффер'),
       geo: (v) => (v.trim() ? null : 'Укажите GEO'),
@@ -80,12 +90,28 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
     },
   });
 
+  // Каждое изменение новой задачи — в черновик; закрытие формы его не трогает
+  useEffect(() => {
+    if (isNew && userId !== undefined) saveDraft(userId, form.values, references.links);
+  }, [isNew, userId, form.values, references.links]);
+
+  // «Сбросить черновик» — пустая форма и удалённый черновик
+  const resetDraft = () => {
+    if (userId !== undefined) clearDraft(userId);
+    form.setValues(initialValues(null));
+    form.resetDirty();
+    setReferences({ links: [], files: [] });
+    setDraft(null);
+  };
+
   const save = (brief: TaskBrief) => {
     const onError = (e: unknown) => notifyError(e);
     if (isNew) {
       create.mutate(brief, {
         onSuccess: async (created) => {
-          // Задача создана — прикладываем референсы; сбой одного не отменяет остальные
+          // Задача создана — черновик больше не нужен
+          if (userId !== undefined) clearDraft(userId);
+          // Прикладываем референсы; сбой одного не отменяет остальные
           setUploading(true);
           const failed = await uploadReferences(created.id, references.links, references.files);
           setUploading(false);
@@ -139,6 +165,20 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
       >
         <form onSubmit={form.onSubmit(submit)}>
           <Stack>
+            {draft && (
+              <Alert color="blue" variant="light" icon={<IconRestore size={18} />}>
+                {/* Кнопка не сжимается: при нехватке места уходит на следующую строку */}
+                <Group justify="space-between" gap="xs">
+                  <Text size="sm" style={{ flex: '1 1 260px' }}>
+                    Восстановлен черновик от {dayjs(draft.savedAt).format('HH:mm')}. Файлы
+                    референсов нужно приложить заново.
+                  </Text>
+                  <Button size="xs" variant="light" style={{ flexShrink: 0 }} onClick={resetDraft}>
+                    Сбросить черновик
+                  </Button>
+                </Group>
+              </Alert>
+            )}
             {!isNew && task.assignee && (
               <Alert color="yellow" variant="light" icon={<IconAlertTriangle size={18} />}>
                 Задача уже в работе у {task.assignee.full_name}. Исполнитель увидит пометку «ТЗ
