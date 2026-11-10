@@ -81,8 +81,25 @@ describe('TaskFormModal — кнопки дедлайна', () => {
     const deadline = () => screen.getByRole('button', { name: /Дедлайн/ }).textContent ?? '';
     const btn = (name: string) => screen.getByRole('button', { name });
 
+    // Порядок: все «минус» (час, день, неделя), затем все «плюс»
+    const steps = screen
+      .getAllByRole('button')
+      .map((b) => b.textContent ?? '')
+      .filter((t) => /^[−+]1 /.test(t));
+    expect(steps).toEqual(['−1 час', '−1 день', '−1 неделя', '+1 час', '+1 день', '+1 неделя']);
     expect(btn('−1 день')).toBeDisabled();
     expect(btn('−1 час')).toBeDisabled();
+    expect(btn('−1 неделя')).toBeDisabled();
+
+    // Неделя вперёд и назад возвращает то же значение
+    await userEvent.click(btn('+1 неделя'));
+    const week = deadline();
+    await userEvent.click(btn('+1 неделя'));
+    await userEvent.click(btn('−1 неделя'));
+    expect(deadline()).toBe(week);
+    await userEvent.click(btn('−1 неделя'));
+    expect(btn('−1 неделя')).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Очистить дедлайн' }));
 
     await userEvent.click(btn('+1 день'));
     await userEvent.click(btn('+1 день'));

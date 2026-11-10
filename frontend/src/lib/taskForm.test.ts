@@ -57,6 +57,8 @@ describe('shiftDeadline', () => {
     expect(shiftDeadline(value, -1, 'day', now)).toBe('2026-11-11 18:00:00');
     expect(shiftDeadline(value, 1, 'hour', now)).toBe('2026-11-12 19:00:00');
     expect(shiftDeadline(value, -1, 'hour', now)).toBe('2026-11-12 17:00:00');
+    expect(shiftDeadline(value, 1, 'week', now)).toBe('2026-11-19 18:00:00');
+    expect(shiftDeadline('2026-11-20 18:00:00', -1, 'week', now)).toBe('2026-11-13 18:00:00');
   });
 
   it('пустой дедлайн: «плюс» — от начала текущего часа, «минус» недоступен', () => {
@@ -66,8 +68,10 @@ describe('shiftDeadline', () => {
   });
 
   it('в прошлое не уходит', () => {
+    const value7 = '2026-11-16 18:00:00';
     expect(shiftDeadline('2026-11-10 11:00:00', -1, 'hour', now)).toBeNull();
     expect(shiftDeadline('2026-11-11 09:00:00', -1, 'day', now)).toBeNull();
+    expect(shiftDeadline(value7, -1, 'week', now)).toBeNull();
     expect(shiftDeadline('2026-11-11 11:00:00', -1, 'day', now)).toBe('2026-11-10 11:00:00');
   });
 });

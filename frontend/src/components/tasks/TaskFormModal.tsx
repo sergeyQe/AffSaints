@@ -34,13 +34,20 @@ import {
 import { CREATIVE_TYPE_LABELS, PRIORITY_LABELS, toOptions } from '../../lib/tasks';
 import { ReferencesInput, type ReferencesValue } from './ReferencesInput';
 
-// Кнопки сдвига дедлайна: каждое нажатие меняет текущее значение
-const DEADLINE_STEPS = [
-  { label: '−1 день', amount: -1, unit: 'day' },
-  { label: '+1 день', amount: 1, unit: 'day' },
-  { label: '−1 час', amount: -1, unit: 'hour' },
-  { label: '+1 час', amount: 1, unit: 'hour' },
+// Кнопки сдвига дедлайна: каждое нажатие меняет текущее значение.
+// Две группы — все «минус», промежуток, все «плюс»; внутри — час, день, неделя
+const DEADLINE_UNITS = [
+  { unit: 'hour', name: 'час' },
+  { unit: 'day', name: 'день' },
+  { unit: 'week', name: 'неделя' },
 ] as const;
+const DEADLINE_GROUPS = [-1, 1].map((amount) =>
+  DEADLINE_UNITS.map((u) => ({
+    label: `${amount < 0 ? '−' : '+'}1 ${u.name}`,
+    amount,
+    unit: u.unit,
+  })),
+);
 
 interface Props {
   /** null — создание новой задачи. */
@@ -183,22 +190,26 @@ export function TaskFormModal({ task, onClose, onCreated }: Props) {
                 minDate={dayjs().format('YYYY-MM-DD')}
                 {...form.getInputProps('deadline')}
               />
-              <Group gap="xs">
-                {DEADLINE_STEPS.map((s) => {
-                  // Недоступный сдвиг (в прошлое или «минус» от пустого) — кнопка неактивна
-                  const next = shiftDeadline(form.values.deadline, s.amount, s.unit);
-                  return (
-                    <Button
-                      key={s.label}
-                      size="xs"
-                      variant="light"
-                      disabled={next === null}
-                      onClick={() => next && form.setFieldValue('deadline', next)}
-                    >
-                      {s.label}
-                    </Button>
-                  );
-                })}
+              <Group gap="lg">
+                {DEADLINE_GROUPS.map((steps) => (
+                  <Group key={steps[0]?.label} gap="xs">
+                    {steps.map((s) => {
+                      // Недоступный сдвиг (в прошлое или «минус» от пустого) — кнопка неактивна
+                      const next = shiftDeadline(form.values.deadline, s.amount, s.unit);
+                      return (
+                        <Button
+                          key={s.label}
+                          size="xs"
+                          variant="light"
+                          disabled={next === null}
+                          onClick={() => next && form.setFieldValue('deadline', next)}
+                        >
+                          {s.label}
+                        </Button>
+                      );
+                    })}
+                  </Group>
+                ))}
               </Group>
             </Stack>
 

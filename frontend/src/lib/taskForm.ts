@@ -19,13 +19,13 @@ export const toPicker = (iso: string | null) => (iso ? dayjs(iso).format(PICKER_
 export const toIso = (local: string | null) => (local ? dayjs(local).toISOString() : null);
 
 /**
- * Сдвиг дедлайна кнопками «±1 день / ±1 час». Пустой дедлайн отсчитывается от начала
+ * Сдвиг дедлайна кнопками «±1 час / ±1 день / ±1 неделя». Пустой дедлайн отсчитывается от начала
  * текущего часа. null — сдвиг недоступен: уменьшать нечего или дедлайн ушёл бы в прошлое.
  */
 export function shiftDeadline(
   value: string | null,
   amount: number,
-  unit: 'day' | 'hour',
+  unit: 'hour' | 'day' | 'week',
   now = dayjs(),
 ): string | null {
   if (!value && amount < 0) return null;
