@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
-from app.core.errors import AppError, Conflict
+from app.core.errors import AppError, Conflict, Forbidden
 from app.models.attachment import AttachmentKind, TaskAttachment
 from app.models.task import Action, EventType, Task, TaskStatus, WorkKind
 from app.models.user import Role, User
@@ -381,6 +381,10 @@ async def move(
         assignee = await _validate_assignee(session, task, assignee_id)
     if target != TaskStatus.NEW and assignee is None:
         raise AppError("assignee_required", "Выберите исполнителя: без него задача — в «Новых»")
+    # Свою работу руководитель не сдаёт и не принимает переносом — как и кнопкой «Принять»
+    is_own_work = assignee is not None and assignee.id == user.id
+    if is_own_work and target in (TaskStatus.REVIEW, TaskStatus.DONE):
+        raise Forbidden("forbidden", "Исполнитель не может сам проверять свою работу")
 
     # Открытый отрезок работы закрывается за тем, кто работал до переноса
     await close_interval(session, task, now)

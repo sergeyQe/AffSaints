@@ -521,6 +521,7 @@ async def test_actions_reflect_role_and_status(as_user: AsUser) -> None:
         "cancel",
         "reassign",
         "unassign",
+        "move",
         "add_reference",
         "manage_ai_usage",
     }
@@ -646,3 +647,16 @@ async def test_move_not_allowed_for_cancelled(as_user: AsUser) -> None:
     tid = (await create_task(buyer))["id"]
     ok(await act(buyer, tid, "cancel", reason="Не нужна"))
     assert (await move(head, tid, "new")).status_code == 409
+
+
+async def test_head_cannot_move_own_work_to_review_or_done(as_user: AsUser) -> None:
+    buyer = as_user(await create_user(Role.BUYER))
+    head_creative = as_user(await create_user(Role.HEAD, Role.CREATIVE))
+    tid = (await create_task(buyer))["id"]
+    ok(await act(head_creative, tid, "take"))
+
+    # Свою работу руководитель не принимает и не отправляет на проверку переносом
+    assert (await move(head_creative, tid, "done")).status_code == 403
+    assert (await move(head_creative, tid, "review")).status_code == 403
+    # Остальные переносы своей задачи доступны
+    assert ok(await move(head_creative, tid, "revision"))["status"] == "revision"
